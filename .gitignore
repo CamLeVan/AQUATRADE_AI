@@ -1,0 +1,85 @@
+# .gitignore tổng cho toàn bộ dự án AquaTrade AI (Monorepo)
+# File này đảm bảo các file rác, file build và file model nặng KHÔNG bị đẩy lên Git.
+
+# =========================
+# 1. PYTHON (AI Service)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+venv/
+ENV/
+# Bỏ qua các file Model YOLO (Rất nặng, nên chia sẻ qua Google Drive)
+*.pt
+*.onnx
+# Bỏ qua video/ảnh test
+*.mp4
+*.avi
+*.jpg
+*.png
+# Bỏ qua log
+*.log
+
+# =========================
+# 2. JAVA (Backend Spring Boot)
+# =========================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+# File cấu hình IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+# File logs
+logs/
+*.log
+
+# =========================
+# 3. NODE.JS / REACT (Frontend)
+# =========================
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.yarn
+.pnp.*
+.eslintcache
+.stylelintcache
+
+# =========================
+# 4. HỆ ĐIỀU HÀNH (OS)
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini

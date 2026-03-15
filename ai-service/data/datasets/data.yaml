@@ -1,0 +1,15 @@
+# Dataset configuration
+path: /home/trinhquyetchien/SmartFingerlingTracker/fish/datasets # dataset root dir
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 2
+names: ['ca_nho', 'ca_to']
+
+roboflow:
+  workspace: fishai-i1kqy
+  project: fish_datasest-gcf9h
+  version: 8
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/fishai-i1kqy/fish_datasest-gcf9h/dataset/8
