@@ -83,3 +83,6 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Ignore old large server files
+core-backend/server_files/
