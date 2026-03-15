@@ -84,5 +84,11 @@ dist-ssr/
 Thumbs.db
 Desktop.ini
 
+# =========================
+# 5. TÀI LIỆU CÁ NHÂN (CHỈ LƯU LOCAL)
+# =========================
+TASK_LIST_SPRINT_1.md
+TEAM_GUIDE_GIT.md
+
 # Ignore old large server files
 core-backend/server_files/
