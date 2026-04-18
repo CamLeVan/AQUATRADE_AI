@@ -1,0 +1,11 @@
+package com.aquatrade.core.service;
+
+import com.aquatrade.core.dto.ListingDto;
+import java.util.List;
+import java.util.UUID;
+
+public interface ListingService {
+    List<ListingDto> getAllListings(String province, String species);
+    ListingDto getListingById(UUID id);
+    ListingDto createListing(ListingDto.CreateListingRequest request);
+}

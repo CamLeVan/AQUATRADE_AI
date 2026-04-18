@@ -7,25 +7,22 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 public class ApiResponse<T> {
-    
-    private String status; // "success" hoặc "error"
-    private String message;
+    private String status;
     private T data;
-
-    // Hàm Helper để trả về dữ liệu thành công cực nhanh gọn
-    public static <T> ApiResponse<T> success(T data, String message) {
-        return new ApiResponse<>("success", message, data);
-    }
+    private String message;
 
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>("success", "Operation successful", data);
+        return ApiResponse.<T>builder().status("success").data(data).build();
     }
 
-    // Hàm Helper định chuẩn cho lỗi
+    public static <T> ApiResponse<T> success(T data, String message) {
+        return ApiResponse.<T>builder().status("success").data(data).message(message).build();
+    }
+
     public static <T> ApiResponse<T> error(String message) {
-        return new ApiResponse<>("error", message, null);
+        return ApiResponse.<T>builder().status("error").message(message).build();
     }
 }
