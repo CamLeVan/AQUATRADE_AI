@@ -51,6 +51,10 @@ public class Listing extends BaseObject {
     @Column(name = "estimated_quantity")
     private Integer estimatedQuantity;
 
+    // [THÊM MỚI] Số lượng thực tế còn lại trong kho (trừ dần khi mua lẻ) để chống Tranh chấp
+    @Column(name = "available_quantity")
+    private Integer availableQuantity;
+
     // [THÊM MỚI] FE gọi là "origin" — BE giữ "province" (đúng nghĩa địa lý, dùng tính logistics)
     @Column(name = "province", nullable = false)
     private String province;

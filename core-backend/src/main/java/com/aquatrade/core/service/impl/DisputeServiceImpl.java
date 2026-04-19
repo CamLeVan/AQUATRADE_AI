@@ -24,6 +24,8 @@ public class DisputeServiceImpl implements DisputeService {
     private final DisputeRepository disputeRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final com.aquatrade.core.repository.TransactionRepository transactionRepository;
+    private final com.aquatrade.core.repository.SystemTreasuryRepository systemTreasuryRepository;
 
     @Override
     public DisputeDto.DisputeResponse createDispute(String orderId, DisputeDto.CreateDisputeRequest request) {
@@ -52,5 +54,105 @@ public class DisputeServiceImpl implements DisputeService {
                 .reasonText(dispute.getReasonText())
                 .createdAt(dispute.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void refundOrder(String disputeId) {
+        Dispute dispute = disputeRepository.findById(UUID.fromString(disputeId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Dispute"));
+        
+        if (dispute.getStatus() != DisputeStatus.OPEN) {
+            throw new IllegalArgumentException("Đơn khiếu nại này đã được xử lý");
+        }
+
+        Order order = dispute.getOrder();
+        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED) {
+            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ, không thể hoàn tiền");
+        }
+
+        // 1. Hoàn tiền lại cho Buyer
+        User buyer = order.getBuyer();
+        java.math.BigDecimal amount = order.getTotalPrice();
+        buyer.setWalletBalance(buyer.getWalletBalance().add(amount));
+        userRepository.save(buyer);
+
+        // 2. Log Transaction
+        com.aquatrade.core.domain.Transaction tx = com.aquatrade.core.domain.Transaction.builder()
+                .order(order)
+                .user(buyer)
+                .amount(amount)
+                .postBalance(buyer.getWalletBalance())
+                .type(com.aquatrade.core.domain.enums.TransactionType.REFUND)
+                .status(com.aquatrade.core.domain.enums.TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(tx);
+
+        // 3. Mark Refunded
+        order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        dispute.setStatus(DisputeStatus.RESOLVED);
+        disputeRepository.save(dispute);
+        log.info("Dispute REFUNDED: Admin hoàn tiền cho Buyer {}", buyer.getFullName());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void forceComplete(String disputeId) {
+        Dispute dispute = disputeRepository.findById(UUID.fromString(disputeId))
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Dispute"));
+        
+        if (dispute.getStatus() != DisputeStatus.OPEN) {
+            throw new IllegalArgumentException("Đơn khiếu nại này đã được xử lý");
+        }
+
+        Order order = dispute.getOrder();
+        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED) {
+            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ");
+        }
+
+        order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.COMPLETED);
+        orderRepository.save(order);
+
+        // Split tiền
+        java.math.BigDecimal total = order.getTotalPrice();
+        java.math.BigDecimal commission = total.multiply(new java.math.BigDecimal("0.05"));
+        java.math.BigDecimal sellerPayout = total.subtract(commission);
+
+        // Nạp cho Seller
+        User seller = order.getListing().getSeller();
+        seller.setWalletBalance(seller.getWalletBalance().add(sellerPayout));
+        userRepository.save(seller);
+
+        com.aquatrade.core.domain.Transaction txSeller = com.aquatrade.core.domain.Transaction.builder()
+                .order(order)
+                .user(seller)
+                .amount(sellerPayout)
+                .postBalance(seller.getWalletBalance())
+                .type(com.aquatrade.core.domain.enums.TransactionType.ORDER_PAYOUT)
+                .status(com.aquatrade.core.domain.enums.TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(txSeller);
+
+        // Nạp cho Treasury
+        com.aquatrade.core.domain.SystemTreasury treasury = systemTreasuryRepository.findById(1)
+                .orElse(com.aquatrade.core.domain.SystemTreasury.builder().id(1).totalRevenue(java.math.BigDecimal.ZERO).build());
+        treasury.setTotalRevenue(treasury.getTotalRevenue().add(commission));
+        systemTreasuryRepository.save(treasury);
+
+        com.aquatrade.core.domain.Transaction txPlatform = com.aquatrade.core.domain.Transaction.builder()
+                .order(order)
+                .user(seller)
+                .amount(commission)
+                .postBalance(treasury.getTotalRevenue())
+                .type(com.aquatrade.core.domain.enums.TransactionType.PLATFORM_COMMISSION)
+                .status(com.aquatrade.core.domain.enums.TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(txPlatform);
+
+        dispute.setStatus(DisputeStatus.REJECTED); // Bác bỏ khiếu nại (bắt Seller giao dịch)
+        disputeRepository.save(dispute);
+        log.info("Dispute REJECTED -> FORCE COMPLETE: Admin chốt đơn, tiền về Seller.");
     }
 }

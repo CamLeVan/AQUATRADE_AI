@@ -22,6 +22,7 @@ public class ListingDto {
     private BigDecimal sizeMax;
     private BigDecimal pricePerFish;
     private Integer estimatedQuantity;
+    private Integer availableQuantity;
     private String thumbnailUrl;
     private ListingStatus status;
     private String sellerName;

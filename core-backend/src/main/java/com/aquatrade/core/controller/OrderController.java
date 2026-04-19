@@ -30,4 +30,11 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderDto.OrderResponse>> getOrder(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.success(orderService.getOrderById(UUID.fromString(id))));
     }
+
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasRole('BUYER')")
+    public ResponseEntity<ApiResponse<String>> completeOrder(@PathVariable String id) {
+        orderService.completeOrder(UUID.fromString(id));
+        return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã hoàn thành. Tiền đã được chuyển vào ví người bán."));
+    }
 }

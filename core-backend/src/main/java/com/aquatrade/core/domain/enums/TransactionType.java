@@ -5,5 +5,7 @@ public enum TransactionType {
     ESCROW_RELEASE,
     REFUND,
     TOP_UP,
-    WITHDRAW
+    WITHDRAW,
+    ORDER_PAYOUT,
+    PLATFORM_COMMISSION
 }

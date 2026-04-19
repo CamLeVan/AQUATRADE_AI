@@ -1,4 +1,4 @@
-package com.aquatrade.core.dto.response.search;
+package com.aquatrade.core.dto.search;
 
 import lombok.Getter;
 import lombok.Setter;

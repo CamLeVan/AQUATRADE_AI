@@ -64,6 +64,7 @@ public class ListingServiceImpl implements ListingService {
                 .sizeMax(request.getSizeMax())
                 .pricePerFish(request.getPricePerFish())
                 .estimatedQuantity(request.getEstimatedQuantity())
+                .availableQuantity(request.getEstimatedQuantity())
                 .status(ListingStatus.PENDING_REVIEW)
                 .seller(seller)
                 .build();
@@ -85,6 +86,7 @@ public class ListingServiceImpl implements ListingService {
                 .sizeMax(entity.getSizeMax())
                 .pricePerFish(entity.getPricePerFish())
                 .estimatedQuantity(entity.getEstimatedQuantity())
+                .availableQuantity(entity.getAvailableQuantity())
                 .status(entity.getStatus())
                 .sellerName(entity.getSeller().getFullName())
                 .createdAt(entity.getCreatedAt())

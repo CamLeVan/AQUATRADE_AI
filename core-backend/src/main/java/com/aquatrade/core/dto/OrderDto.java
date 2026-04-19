@@ -19,6 +19,10 @@ public class OrderDto {
 
         @NotBlank(message = "Thiếu địa chỉ giao hàng")
         private String shippingAddress;
+
+        @jakarta.validation.constraints.NotNull(message = "Phải nhập số lượng muốn mua")
+        @jakarta.validation.constraints.Positive(message = "Số lượng mua phải lớn hơn 0")
+        private Integer quantity;
     }
 
     @Data

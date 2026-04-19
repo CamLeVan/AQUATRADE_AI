@@ -16,6 +16,9 @@ public class DashboardStatsDto {
     private Integer totalListings;
     private Integer lowStockAlertCount;
     private Integer aiNetworkHealth; // 0-100
+    private java.math.BigDecimal totalRevenue;
+    private java.math.BigDecimal totalVolume;
+    private java.math.BigDecimal pendingLiabilities;
 
     @Data
     @Builder
