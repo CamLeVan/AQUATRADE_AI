@@ -117,7 +117,8 @@ public class DisputeServiceImpl implements DisputeService {
 
         // Split tiền
         java.math.BigDecimal total = order.getTotalPrice();
-        java.math.BigDecimal commission = total.multiply(new java.math.BigDecimal("0.05"));
+        java.math.BigDecimal commission = total.multiply(new java.math.BigDecimal("0.05"))
+                .setScale(0, java.math.RoundingMode.HALF_UP);
         java.math.BigDecimal sellerPayout = total.subtract(commission);
 
         // Nạp cho Seller

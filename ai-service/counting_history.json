@@ -1,1 +1,7 @@
-[{"session": 1, "timestamp": "2025-07-19 16:41:24", "count": 26, "confidence": 0.7113408017158508, "method": "statistical", "duration": 29.923161268234253, "ratio": 1.1590567827224731}]
+[{"session": 1,
+  "timestamp": "2025-07-19 16:41:24",
+  "count": 26,
+  "confidence": 0.7113408017158508,
+  "method": "statistical",
+  "duration": 29.923161268234253,
+  "ratio": 1.1590567827224731}]

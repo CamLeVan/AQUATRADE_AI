@@ -146,7 +146,8 @@ public class OrderServiceImpl implements OrderService {
 
         // Chuyển hóa dòng tiền (End-Game): 5% Platform, 95% Seller
         BigDecimal total = order.getTotalPrice();
-        BigDecimal commission = total.multiply(new BigDecimal("0.05"));
+        BigDecimal commission = total.multiply(new BigDecimal("0.05"))
+                .setScale(0, java.math.RoundingMode.HALF_UP);
         BigDecimal sellerPayout = total.subtract(commission);
 
         // 1. Chuyển tiền cho Seller

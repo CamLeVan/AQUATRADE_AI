@@ -41,4 +41,9 @@ public class Dispute extends BaseObject {
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    // [SECURITY] Optimistic Locking — chặn 2 Admin đồng thời Refund + ForceComplete cùng 1 Dispute
+    @Version
+    @Column(name = "version")
+    private Integer version;
 }

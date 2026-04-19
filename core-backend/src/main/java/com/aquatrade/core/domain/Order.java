@@ -48,5 +48,10 @@ public class Order extends BaseObject {
     // Liên kết 1-1 với bằng chứng số do AI xuất ra (nạp Lazy để khỏi lụt)
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private DigitalProof digitalProof;
+
+    // [SECURITY] Optimistic Locking — chặn Double Refund / Double Complete race condition
+    @Version
+    @Column(name = "version")
+    private Integer version;
 }
 

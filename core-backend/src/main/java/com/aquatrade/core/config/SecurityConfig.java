@@ -1,6 +1,7 @@
 package com.aquatrade.core.config;
 
 import com.aquatrade.core.security.JwtAuthenticationFilter;
+import com.aquatrade.core.security.InternalApiKeyFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
     private final org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource;
 
     @Bean
@@ -43,6 +45,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/listings/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/posts/**").permitAll()
 
+                // === INTERNAL (API Key Auth, không dùng JWT) ===
+                .requestMatchers("/api/v1/internal/**").permitAll()
+
                 // === ADMIN ONLY ===
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
@@ -51,6 +56,8 @@ public class SecurityConfig {
             )
             
             // Gắn JWT Filter chạy TRƯỚC filter mặc định của Spring
+            // InternalApiKeyFilter chạy TRƯỚC JWT → chặn /internal/ bằng API Key
+            .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
