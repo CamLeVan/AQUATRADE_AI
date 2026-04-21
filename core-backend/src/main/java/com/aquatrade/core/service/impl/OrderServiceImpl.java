@@ -21,6 +21,7 @@ import com.aquatrade.core.domain.enums.TransactionStatus;
 import com.aquatrade.core.repository.TransactionRepository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import com.aquatrade.core.domain.SystemTreasury;
 import com.aquatrade.core.repository.SystemTreasuryRepository;
@@ -107,6 +108,15 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + id));
         return mapToDto(order);
+    }
+
+    @Override
+    public List<OrderDto.OrderResponse> getMyOrders() {
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return orderRepository.findByBuyerIdOrderByCreatedAtDesc(currentUserId)
+                .stream()
+                .map(this::mapToDto)
+                .toList();
     }
 
     private OrderDto.OrderResponse mapToDto(Order entity) {

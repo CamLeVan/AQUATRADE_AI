@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -29,6 +30,11 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<OrderDto.OrderResponse>> getOrder(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.success(orderService.getOrderById(UUID.fromString(id))));
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<OrderDto.OrderResponse>>> getMyOrders() {
+        return ResponseEntity.ok(ApiResponse.success(orderService.getMyOrders()));
     }
 
     @PostMapping("/{id}/complete")
