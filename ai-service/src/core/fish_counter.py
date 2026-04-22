@@ -743,17 +743,11 @@ class FishCounter:
             return None
 
     def calculate_biomass(self, area, class_id):
-        try:
-            params = self.biomass_params.get(class_id, self.biomass_params.get(0))
-            if params:
-                a = params['a']
-                b = params['b']
-                weight = a * (area ** b)
-                return weight
-            return 0
-        except Exception as e:
-            logging.error(f"Error calculating biomass: {e}")
-            return 0
+        # Delegate sang biomass module để giữ DRY giữa FishCounter (GUI)
+        # và pipeline (async worker). self.biomass_params vẫn giữ để các
+        # test/cấu hình cũ override được per-instance.
+        from .biomass import calculate_weight
+        return calculate_weight(area, class_id, self.biomass_params)
 
     def is_counting_finished(self):
         return not self.is_counting
