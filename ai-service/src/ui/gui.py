@@ -361,10 +361,7 @@ class MainWindow(QMainWindow):
             self.load_history()
             self.showMaximized()
             logging.info("MainWindow initialized")
-            
-            self.showMaximized()
-            logging.info("MainWindow initialized")
-            
+
             self.elapsed_time = 0
             self.showing_final_result = False
             self.current_fai_display = 0.0 # Biến giữ giá trị FAI đang hiển thị (để làm hiệu ứng mượt)

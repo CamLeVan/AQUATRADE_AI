@@ -169,14 +169,6 @@ class SimpleTracker:
         
         # Ghép cặp detections với tracks
         if detections:
-            # Lọc nhiễu: Chỉ tính nếu di chuyển > 1.0 pixel
-            # The original instruction was to change 'if distance > 2.0:' to 'if distance > 1.0:'.
-            # However, 'distance' is not defined in this scope, and 'if distance > 1.0:tracks:' is syntactically incorrect.
-            # Assuming the intent was to add a placeholder for a future filter or a comment.
-            # Since the instruction specifically asked to change 'if distance > 2.0:' to 'if distance > 1.0:',
-            # and 'if distance > 2.0:' does not exist, I will add the line 'if distance > 1.0:' as a comment
-            # to reflect the instruction's intent without introducing a syntax error or undefined variable.
-            # if distance > 1.0: # Placeholder for filtering based on movement distance
             if self.tracks:
                 iou_matrix = np.zeros((len(self.tracks), len(detections)))
                 for i, track in enumerate(self.tracks):

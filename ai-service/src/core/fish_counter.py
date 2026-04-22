@@ -10,7 +10,6 @@ import os
 
 # Import các module từ cùng package core
 # Sử dụng relative import vì chúng nằm cùng thư mục src/core
-from .kalman_filter import KalmanFilter
 from .tracker import SimpleTracker
 from .reid import SimpleReID
 
@@ -146,7 +145,6 @@ class FishCounter:
             self.start_time = time.time()
             self.final_count = 0
             self.unique_fish_count = 0
-            self.track_to_fish_map = {}
             self.track_to_fish_map = {}
             self.count_buffer.clear()
             self.biomass_buffer.clear()
@@ -463,11 +461,14 @@ class FishCounter:
                     scores = np.array([d[1] for d in detections])
                     
                     # NMSBoxes của OpenCV
+                    # nms_threshold=0.7: cho phép chồng lấn cao (cá bơi đàn) nhưng
+                    # vẫn loại được box trùng lặp hoàn toàn (double detection do 2 class gán chung 1 cá).
+                    # Giá trị cũ = 1 đã vô hiệu hóa NMS → bỏ sót nhiều box trùng.
                     nms_indices = cv2.dnn.NMSBoxes(
-                        boxes.tolist(), 
-                        scores.tolist(), 
-                        score_threshold=0.45, 
-                        nms_threshold=1  # Ngưỡng 0.8: Chấp nhận chồng lấn cao (cá bơi đàn) nhưng loại bỏ box trùng lặp (double detection)
+                        boxes.tolist(),
+                        scores.tolist(),
+                        score_threshold=0.45,
+                        nms_threshold=0.7
                     )
                     
                     if isinstance(nms_indices, tuple): nms_indices = nms_indices[0]
