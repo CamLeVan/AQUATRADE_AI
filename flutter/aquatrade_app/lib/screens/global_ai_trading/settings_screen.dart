@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../data/models/auth_model.dart';
 import 'screen_scaffold.dart';
+import 'admin_console_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -34,14 +36,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Consumer<AuthProvider>(
             builder: (context, auth, _) {
               final user = auth.currentUser;
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.person_outline),
-                  title: Text(user?.fullName.isNotEmpty == true ? user!.fullName : 'Account'),
-                  subtitle: Text(user?.email ?? 'Profile, security, sessions'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
+              final isAdmin = user?.role == Role.ADMIN;
+              return Column(
+                children: [
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: Text(user?.fullName.isNotEmpty == true ? user!.fullName : 'Account'),
+                      subtitle: Text(user?.email ?? 'Profile, security, sessions'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {},
+                    ),
+                  ),
+                  if (isAdmin) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.admin_panel_settings, color: Colors.red),
+                        title: const Text('Admin Console', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminConsoleScreen()));
+                        },
+                      ),
+                    ),
+                  ],
+                ],
               );
             },
           ),

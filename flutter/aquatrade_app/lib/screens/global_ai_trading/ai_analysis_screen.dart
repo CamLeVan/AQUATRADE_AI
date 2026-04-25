@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'screen_scaffold.dart';
 
 class AiAnalysisScreen extends StatelessWidget {
-  const AiAnalysisScreen({super.key});
+  final String symbol;
+  const AiAnalysisScreen({super.key, required this.symbol});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ScreenScaffold(
-      title: 'AI Analysis',
+      title: 'AI Analysis - $symbol',
       actions: [
         IconButton(onPressed: () {}, icon: const Icon(Icons.tune)),
       ],

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'screen_scaffold.dart';
+import '../../data/models/listing_model.dart';
+import 'package:intl/intl.dart';
+import 'ai_analysis_screen.dart';
+import 'create_order_screen.dart';
 
 class AssetDetailScreen extends StatefulWidget {
-  const AssetDetailScreen({super.key});
+  final ListingModel listing;
+  const AssetDetailScreen({super.key, required this.listing});
 
   @override
   State<AssetDetailScreen> createState() => _AssetDetailScreenState();
@@ -43,7 +48,13 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CreateOrderScreen(initialListingId: widget.listing.id),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.shopping_cart_outlined),
                 label: const Text('Trade'),
               ),
@@ -64,26 +75,26 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                     children: [
                       CircleAvatar(
                         backgroundColor: theme.colorScheme.primaryContainer,
-                        child: const Icon(Icons.show_chart),
+                        child: const Icon(Icons.set_meal),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('AAPL', style: theme.textTheme.titleLarge),
-                            Text('Apple Inc.', style: theme.textTheme.bodySmall),
+                            Text(widget.listing.title, style: theme.textTheme.titleLarge),
+                            Text(widget.listing.sellerName, style: theme.textTheme.bodySmall),
                           ],
                         ),
                       ),
                       Chip(
-                        label: const Text('+1.2%'),
-                        backgroundColor: Colors.green.withOpacity(0.15),
+                        label: Text(widget.listing.category.toString().split('.').last),
+                        backgroundColor: Colors.blue.withOpacity(0.15),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text('\$212.35', style: theme.textTheme.headlineSmall),
+                  Text(NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(widget.listing.pricePerFish), style: theme.textTheme.headlineSmall),
                   const SizedBox(height: 12),
                   const SizedBox(height: 150, child: _MiniChart()),
                 ],
@@ -118,7 +129,24 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           const SizedBox(height: 16),
           Text('Key stats', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
-          const _StatsGrid(),
+          _StatsGrid(listing: widget.listing),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AiAnalysisScreen(symbol: widget.listing.title),
+                ),
+              );
+            },
+            icon: const Icon(Icons.psychology),
+            label: const Text('Phân tích AI'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -162,7 +190,8 @@ class _MiniChartPainter extends CustomPainter {
 }
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid();
+  const _StatsGrid({required this.listing});
+  final ListingModel listing;
 
   @override
   Widget build(BuildContext context) {
@@ -174,15 +203,15 @@ class _StatsGrid extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: _Stat(label: 'Volume', value: '62.1M')),
-                Expanded(child: _Stat(label: 'Market cap', value: '\$3.2T')),
+                Expanded(child: _Stat(label: 'Species', value: listing.species)),
+                Expanded(child: _Stat(label: 'Province', value: listing.province)),
               ],
             ),
             const Divider(height: 16),
             Row(
               children: [
-                Expanded(child: _Stat(label: 'P/E', value: '31.4')),
-                Expanded(child: _Stat(label: '52W range', value: '164–240')),
+                Expanded(child: _Stat(label: 'Available', value: '${listing.availableQuantity}')),
+                Expanded(child: _Stat(label: 'Est. Quantity', value: '${listing.estimatedQuantity}')),
               ],
             ),
             const SizedBox(height: 6),
