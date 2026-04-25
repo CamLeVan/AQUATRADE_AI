@@ -56,4 +56,13 @@ public class AdminController {
         AdminDto.TreasurySummary summary = adminService.getTreasury();
         return ResponseEntity.ok(ApiResponse.success(summary));
     }
+
+    // ---------- Listings Moderation ----------
+    @PutMapping("/listings/{id}/moderate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> moderateListing(@PathVariable String id,
+                                                               @RequestBody AdminDto.ModerateListingRequest request) {
+        adminService.moderateListing(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Đã cập nhật trạng thái tin đăng thành công"));
+    }
 }
