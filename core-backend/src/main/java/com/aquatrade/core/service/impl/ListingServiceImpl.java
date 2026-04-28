@@ -27,15 +27,16 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public List<ListingDto> getAllListings(String province, String species) {
         List<Listing> listings;
+        ListingStatus activeStatus = ListingStatus.AVAILABLE;
 
         if (province != null && species != null) {
-            listings = listingRepository.findByProvinceAndSpecies(province, species);
+            listings = listingRepository.findByProvinceAndSpeciesAndStatus(province, species, activeStatus);
         } else if (province != null) {
-            listings = listingRepository.findByProvince(province);
+            listings = listingRepository.findByProvinceAndStatus(province, activeStatus);
         } else if (species != null) {
-            listings = listingRepository.findBySpecies(species);
+            listings = listingRepository.findBySpeciesAndStatus(species, activeStatus);
         } else {
-            listings = listingRepository.findAll();
+            listings = listingRepository.findByStatus(activeStatus);
         }
 
         return listings.stream().map(this::mapToDto).collect(Collectors.toList());

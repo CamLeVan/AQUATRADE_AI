@@ -26,10 +26,15 @@ const Login = () => {
             if (response.data.status === 'success') {
                 const { token, refreshToken, role, userId } = response.data.data;
                 
-                // Lưu token
+                // Lưu token và thông tin người dùng đồng bộ
                 localStorage.setItem('accessToken', token);
                 localStorage.setItem('refreshToken', refreshToken);
-                localStorage.setItem('userRole', role);
+                localStorage.setItem('user', JSON.stringify({
+                    userId: userId,
+                    role: role,
+                    fullName: response.data.data.fullName || (role === 'ADMIN' ? 'System Admin' : 'Aqua Seller')
+                }));
+                localStorage.setItem('userRole', role); // Giữ lại bản cũ để tránh lỗi các file khác chưa cập nhật
                 localStorage.setItem('userId', userId);
 
                 // Chuyển hướng theo Role

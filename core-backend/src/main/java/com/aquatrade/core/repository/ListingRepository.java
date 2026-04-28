@@ -9,7 +9,8 @@ import java.util.UUID;
 
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, UUID> {
-    List<Listing> findByProvinceAndSpecies(String province, String species);
-    List<Listing> findByProvince(String province);
-    List<Listing> findBySpecies(String species);
+    List<Listing> findByStatus(ListingStatus status);
+    List<Listing> findByProvinceAndSpeciesAndStatus(String province, String species, ListingStatus status);
+    List<Listing> findByProvinceAndStatus(String province, ListingStatus status);
+    List<Listing> findBySpeciesAndStatus(String species, ListingStatus status);
 }

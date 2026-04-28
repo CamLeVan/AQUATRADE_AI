@@ -41,6 +41,27 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    public java.util.List<com.aquatrade.core.dto.ListingDto> getAllPendingListings() {
+        return listingRepository.findByStatus(ListingStatus.PENDING_REVIEW).stream()
+                .map(l -> com.aquatrade.core.dto.ListingDto.builder()
+                        .id(l.getId().toString())
+                        .title(l.getTitle())
+                        .category(l.getCategory())
+                        .species(l.getSpecies())
+                        .province(l.getProvince())
+                        .sizeMin(l.getSizeMin())
+                        .sizeMax(l.getSizeMax())
+                        .pricePerFish(l.getPricePerFish())
+                        .estimatedQuantity(l.getEstimatedQuantity())
+                        .availableQuantity(l.getAvailableQuantity())
+                        .status(l.getStatus())
+                        .sellerName(l.getSeller().getFullName())
+                        .createdAt(l.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
     public java.util.List<AdminDto.UserSummary> getAllUsers() {
         return userRepository.findAll().stream().map(u -> new AdminDto.UserSummary(
                 u.getId(), u.getFullName(), u.getEmail(), u.getStatus(), u.getCreatedAt()))

@@ -1,7 +1,54 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from './layout/AdminLayout';
+import api from '../../services/api';
 
 const MarketplaceControl = () => {
+    const [pendingListings, setPendingListings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        total: 2840, // Mock for now or fetch if available
+        pending: 0,
+        flagged: 18,
+        success: 1205
+    });
+
+    useEffect(() => {
+        fetchPendingListings();
+    }, []);
+
+    const fetchPendingListings = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/admin/listings/pending');
+            if (response.data.success) {
+                setPendingListings(response.data.data);
+                setStats(prev => ({ ...prev, pending: response.data.data.length }));
+            }
+        } catch (error) {
+            console.error('Lỗi khi lấy danh sách chờ duyệt:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleModerate = async (id, status, note = '') => {
+        try {
+            const response = await api.put(`/admin/listings/${id}/moderate`, {
+                moderationStatus: status,
+                moderationNote: note || (status === 'AVAILABLE' ? 'Đã phê duyệt' : 'Từ chối bởi Admin')
+            });
+            
+            if (response.data.success) {
+                // Refresh list
+                fetchPendingListings();
+                alert(status === 'AVAILABLE' ? 'Đã duyệt sản phẩm thành công!' : 'Đã từ chối sản phẩm.');
+            }
+        } catch (error) {
+            console.error('Lỗi khi duyệt sản phẩm:', error);
+            alert('Có lỗi xảy ra: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
     return (
         <AdminLayout>
             <div className="p-8 space-y-8 max-w-[1600px] mx-auto w-full">
@@ -24,7 +71,7 @@ const MarketplaceControl = () => {
                                 <span className="material-symbols-outlined text-5xl">list_alt</span>
                             </div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tổng Tin Đăng</p>
-                            <p className="text-3xl font-black text-slate-800">2,840</p>
+                            <p className="text-3xl font-black text-slate-800">{stats.total.toLocaleString()}</p>
                             <p className="text-xs text-teal-600 font-medium mt-2 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm">trending_up</span> +12% tháng này
                             </p>
@@ -34,7 +81,7 @@ const MarketplaceControl = () => {
                                 <span className="material-symbols-outlined text-5xl">pending_actions</span>
                             </div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Chờ Duyệt</p>
-                            <p className="text-3xl font-black text-slate-800">142</p>
+                            <p className="text-3xl font-black text-slate-800">{stats.pending}</p>
                             <p className="text-xs text-amber-500 font-medium mt-2">Cần xử lý ngay</p>
                         </div>
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
@@ -42,7 +89,7 @@ const MarketplaceControl = () => {
                                 <span className="material-symbols-outlined text-5xl text-red-500">gpp_maybe</span>
                             </div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Cảnh Báo AI</p>
-                            <p className="text-3xl font-black text-red-500">18</p>
+                            <p className="text-3xl font-black text-red-500">{stats.flagged}</p>
                             <p className="text-xs text-red-400 font-medium mt-2">Vi phạm quy định</p>
                         </div>
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
@@ -50,7 +97,7 @@ const MarketplaceControl = () => {
                                 <span className="material-symbols-outlined text-5xl">handshake</span>
                             </div>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Giao Dịch Thành Công</p>
-                            <p className="text-3xl font-black text-slate-800">1,205</p>
+                            <p className="text-3xl font-black text-slate-800">{stats.success.toLocaleString()}</p>
                             <p className="text-xs text-[#13ecc8] font-bold mt-2">Tỷ lệ khớp lệnh 84%</p>
                         </div>
                     </div>
@@ -81,7 +128,12 @@ const MarketplaceControl = () => {
                     </div>
                     <div className="flex items-center gap-2">
                         <button className="px-4 py-2.5 bg-white text-slate-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm">Xuất báo cáo</button>
-                        <button className="px-4 py-2.5 bg-[#13ecc8] text-slate-900 text-xs font-bold uppercase tracking-widest rounded-lg shadow-sm hover:opacity-90 transition-all active:scale-95">Làm mới dữ liệu</button>
+                        <button 
+                            onClick={fetchPendingListings}
+                            className="px-4 py-2.5 bg-[#13ecc8] text-slate-900 text-xs font-bold uppercase tracking-widest rounded-lg shadow-sm hover:opacity-90 transition-all active:scale-95"
+                        >
+                            Làm mới dữ liệu
+                        </button>
                     </div>
                 </section>
 
@@ -90,8 +142,8 @@ const MarketplaceControl = () => {
                     {/* Listings Table (Lg: 8 cols) */}
                     <section className="lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Danh Sách Tin Đăng</h2>
-                            <span className="text-[10px] text-slate-400 font-bold">HIỂN THỊ 1-10 TRÊN 142</span>
+                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Danh Sách Tin Đăng Chờ Duyệt</h2>
+                            <span className="text-[10px] text-slate-400 font-bold">HIỂN THỊ {pendingListings.length} KẾT QUẢ</span>
                         </div>
                         <div className="overflow-x-auto w-full">
                             <table className="w-full text-left min-w-[700px]">
@@ -105,136 +157,77 @@ const MarketplaceControl = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {/* Row 1 */}
-                                    <tr className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                                                    <img alt="Shrimp" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_-IyBjHeb2j2L-Md6LV_7k2fLnycLT5TkxhebhtfjoiR7dDGCY0m8f2LsI0zQH7KfcNjW5bOrj2eTklkHtvxvjRvJ-pc2aQax2AAV2HPChthOsq_Foq_C2iMvpWekYNtGnvsSW0jZl4sceSkhEO7k6v8wVSKHHO0qhnqK4zk9eHHbP1_FSjYLnA7fa7cqARagdb46Ffj5P6yxKy-aXdu5iElKB0XwRDfbhLKfG5N7b1e3EKF16IDqxB-hn7rpac38rZ8LdjZ2-Lnd"/>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">Đang tải dữ liệu...</td>
+                                        </tr>
+                                    ) : pendingListings.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">Không có tin đăng nào đang chờ duyệt.</td>
+                                        </tr>
+                                    ) : pendingListings.map((listing) => (
+                                        <tr key={listing.id} className="hover:bg-slate-50 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
+                                                        <img 
+                                                            alt={listing.title} 
+                                                            className="w-full h-full object-cover" 
+                                                            src="https://images.unsplash.com/photo-1553659971-f01207815844?auto=format&fit=crop&q=80&w=200"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-800">{listing.title}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{listing.species} | {listing.province}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800">Tôm Thẻ Chân Trắng</p>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Size: 30 con/kg</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-[10px] text-cyan-600">person</span>
+                                                    </div>
+                                                    <p className="text-xs font-semibold text-slate-600">{listing.sellerName}</p>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-slate-200"></div>
-                                                <p className="text-xs font-semibold text-slate-600">Minh Ocean Farm</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="text-sm font-black text-slate-800">185,000đ</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Giá/Kg</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="w-full min-w-[100px] flex flex-col gap-1.5">
-                                                <div className="flex justify-between items-center text-[10px] font-bold text-[#00cfa8]">
-                                                    <span>A+ High</span>
-                                                    <span>98%</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="text-sm font-black text-slate-800">{listing.pricePerFish?.toLocaleString()}đ</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Giá/con (Ước tính)</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="w-full min-w-[100px] flex flex-col gap-1.5">
+                                                    <div className="flex justify-between items-center text-[10px] font-bold text-[#00cfa8]">
+                                                        <span>AI Verified</span>
+                                                        <span>95%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-[#13ecc8]" style={{ width: '95%' }}></div>
+                                                    </div>
                                                 </div>
-                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-[#13ecc8]" style={{ width: '98%' }}></div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button 
+                                                        onClick={() => handleModerate(listing.id, 'AVAILABLE')}
+                                                        className="p-2 bg-[#13ecc8]/10 text-[#00cfa8] rounded-lg hover:bg-[#13ecc8] hover:text-white transition-all shadow-sm" 
+                                                        title="Duyệt"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm font-bold">check</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const reason = prompt('Nhập lý do từ chối:');
+                                                            if (reason) handleModerate(listing.id, 'REJECTED', reason);
+                                                        }}
+                                                        className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm" 
+                                                        title="Từ chối"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm font-bold">close</span>
+                                                    </button>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button className="p-2 bg-[#13ecc8]/10 text-[#00cfa8] rounded-lg hover:bg-[#13ecc8] hover:text-white transition-all shadow-sm" title="Duyệt">
-                                                    <span className="material-symbols-outlined text-sm font-bold">check</span>
-                                                </button>
-                                                <button className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm" title="Từ chối">
-                                                    <span className="material-symbols-outlined text-sm font-bold">close</span>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {/* Row 2 */}
-                                    <tr className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                                                    <img alt="Fish" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgzYdLXq8gFTQyDW8ju0KbXi5xPPXVsaAadN7n8xHKby8ykTFC9cm2WG4e4xhqqqEc_C5zUQ5jgYVfEg5dpmWRJY75_gGU1uta3LNze3pM6zFJfMCi-KGQBp1wXBpPnL4DfB65tB346tg_zW0E2_B1o4jcJP7CaAXCRyc8racomzz3VvAuJe0nj0Z-1i1uM8Wev21OwS_P0bcZo2CBbwDadCS2XPnQD6-sk0pDE584bvbEtE10PbsVDX0ctHNKkml9eQhjp5VwUeOt"/>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800">Cá Tra Xuất Khẩu</p>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Sạch, VietGAP</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-slate-200"></div>
-                                                <p className="text-xs font-semibold text-slate-600">Hợp Tác Xã An Giang</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="text-sm font-black text-slate-800">32,500đ</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Giá/Kg</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="w-full min-w-[100px] flex flex-col gap-1.5">
-                                                <div className="flex justify-between items-center text-[10px] font-bold text-[#00cfa8]">
-                                                    <span>A Standard</span>
-                                                    <span>82%</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-[#13ecc8]" style={{ width: '82%' }}></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button className="p-2 bg-[#13ecc8]/10 text-[#00cfa8] rounded-lg hover:bg-[#13ecc8] hover:text-white transition-all shadow-sm">
-                                                    <span className="material-symbols-outlined text-sm font-bold">check</span>
-                                                </button>
-                                                <button className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                                                    <span className="material-symbols-outlined text-sm font-bold">close</span>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {/* Row 3 (Flagged) */}
-                                    <tr className="hover:bg-red-50 transition-colors group bg-red-50/50">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                                                    <img alt="Crab" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVS5OIhm3wS-wa8-OF81gVfqq5PL-WiX8bUfZGhaYXCl8qSQzyx_nHWN7tDXO5K_JiEOpRoev0EkSg2MblixkcOVELl9THQvTsdBeaOtzL_NatUNYGgqx6sPR8LBbiW50g74ICVldHvDWVHTiq7K3m2gPzJJoMvlekck9_-g7EYPtwu2JJNYN75PrMeCEF8eqR4HX_KPSyqIof0uqgqpy6c_1HvKT4xahxd0pIk4EAWuTqzKz4a0M6AaSBjucg0AelNTFHpIx05euV"/>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800">Cua Cà Mau Loại 1</p>
-                                                    <p className="text-[10px] text-red-500 font-bold uppercase tracking-tight">AI Warning: Ảnh copy</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-6 h-6 rounded-full bg-slate-200"></div>
-                                                <p className="text-xs font-semibold text-slate-600">User_84920</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="text-sm font-black text-slate-800">450,000đ</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Giá/Kg</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="w-full min-w-[100px] flex flex-col gap-1.5">
-                                                <div className="flex justify-between items-center text-[10px] font-bold text-red-500">
-                                                    <span>F Poor</span>
-                                                    <span>12%</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-red-500" style={{ width: '12%' }}></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button className="px-3 py-1.5 bg-white text-[10px] font-black uppercase border border-red-200 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors shadow-sm">Xoá Ngay</button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>

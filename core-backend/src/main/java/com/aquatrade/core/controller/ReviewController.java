@@ -17,7 +17,7 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @PostMapping
-    @PreAuthorize("hasRole('BUYER')")
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
     public ResponseEntity<ApiResponse<String>> submitReview(
             @PathVariable String orderId,
             @Valid @RequestBody ReviewDto.CreateReviewRequest request) {

@@ -58,6 +58,12 @@ public class AdminController {
     }
 
     // ---------- Listings Moderation ----------
+    @GetMapping("/listings/pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<com.aquatrade.core.dto.ListingDto>>> getPendingListings() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAllPendingListings()));
+    }
+
     @PutMapping("/listings/{id}/moderate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> moderateListing(@PathVariable String id,

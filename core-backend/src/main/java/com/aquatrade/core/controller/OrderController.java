@@ -20,7 +20,7 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    @PreAuthorize("hasRole('BUYER')")
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
     public ResponseEntity<ApiResponse<OrderDto.OrderResponse>> createOrder(
             @Valid @RequestBody OrderDto.CreateOrderRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -38,7 +38,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasRole('BUYER')")
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
     public ResponseEntity<ApiResponse<String>> completeOrder(@PathVariable String id) {
         orderService.completeOrder(UUID.fromString(id));
         return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã hoàn thành. Tiền đã được chuyển vào ví người bán."));

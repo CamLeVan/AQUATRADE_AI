@@ -4,6 +4,7 @@ import com.aquatrade.core.dto.AdminDto;
 
 public interface AdminService {
     void moderateListing(String listingId, AdminDto.ModerateListingRequest request);
+    java.util.List<com.aquatrade.core.dto.ListingDto> getAllPendingListings();
 
     // [NEW] Quản lý Users
     java.util.List<AdminDto.UserSummary> getAllUsers();

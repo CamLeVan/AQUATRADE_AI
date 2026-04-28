@@ -9,6 +9,9 @@ const Sidebar = () => {
         return location.pathname.startsWith(path);
     };
 
+    const user = JSON.parse(localStorage.getItem('user')) || {};
+    const userRole = user.role || 'Visitor';
+
     const navItems = [
         { path: '/', label: 'Dashboard', icon: 'dashboard' },
         { path: '/prices', label: 'Market Prices', icon: 'payments' },
@@ -19,6 +22,17 @@ const Sidebar = () => {
         { path: '/chat', label: 'AI Chat', icon: 'chat' },
         { path: '/settings', label: 'Settings', icon: 'settings' },
     ];
+
+    // Nếu là Seller hoặc Admin thì hiện thêm nút vào khu quản trị
+    if (userRole === 'SELLER' || userRole === 'ADMIN') {
+        navItems.splice(1, 0, { path: '/admin', label: 'Management Area', icon: 'admin_panel_settings' });
+    }
+
+    const handleLogout = () => {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+    };
 
     return (
         <aside className="hidden lg:flex fixed left-0 top-0 h-full w-64 border-r border-[#13ecc8]/10 bg-slate-50 dark:bg-slate-950 z-50 flex-col py-6">
@@ -73,10 +87,13 @@ const Sidebar = () => {
                     <span className="material-symbols-outlined text-xl">help_outline</span>
                     Support
                 </Link>
-                <Link className="flex items-center gap-3 px-6 py-3 text-slate-500 dark:text-slate-400 hover:text-[#13ecc8] hover:bg-[#13ecc8]/5 transition-colors font-['Inter'] uppercase tracking-widest text-[11px] font-bold" to="/login">
+                <button 
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-6 py-3 text-red-500 hover:bg-red-50 transition-colors font-['Inter'] uppercase tracking-widest text-[11px] font-bold"
+                >
                     <span className="material-symbols-outlined text-xl">logout</span>
                     Logout
-                </Link>
+                </button>
             </div>
         </aside>
     );
