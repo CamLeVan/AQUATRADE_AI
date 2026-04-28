@@ -1,8 +1,53 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Footer from '../../components/layout/Footer';
+import api from '../../services/api';
 
 const Login = () => {
+    const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const response = await api.post('/auth/login', {
+                email,
+                password,
+                rememberMe
+            });
+
+            if (response.data.status === 'success') {
+                const { token, refreshToken, role, userId } = response.data.data;
+                
+                // Lưu token
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem('userRole', role);
+                localStorage.setItem('userId', userId);
+
+                // Chuyển hướng theo Role
+                if (role === 'SELLER' || role === 'ADMIN') {
+                    navigate('/admin'); // Seller/Admin vào khu vực quản trị/đăng tin
+                } else {
+                    navigate('/'); // Buyer vào trang chủ mua sắm
+                }
+            } else {
+                setError(response.data.message || 'Đăng nhập thất bại.');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Có lỗi xảy ra khi kết nối máy chủ.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="bg-background-light dark:bg-background-dark font-display min-h-screen">
             <main className="flex min-h-screen overflow-hidden">
@@ -62,16 +107,21 @@ const Login = () => {
                         <div className="mb-10">
                             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Welcome back</h2>
                             <p className="text-slate-500 dark:text-slate-400">Enter your credentials to access the marketplace.</p>
+                            {error && (
+                                <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+                                    {error}
+                                </div>
+                            )}
                         </div>
 
-                        <form className="space-y-6">
+                        <form className="space-y-6" onSubmit={handleLogin}>
                             {/* Email Input */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" htmlFor="email">Email Address</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     </div>
-                                    <input className="block w-full  bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all sm:text-sm" id="email" name="email" placeholder="longfpt@company.com" required type="email" />
+                                    <input className="block w-full  bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all sm:text-sm" id="email" name="email" placeholder="longfpt@company.com" required type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                                 </div>
                             </div>
 
@@ -84,21 +134,21 @@ const Login = () => {
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     </div>
-                                    <input className="block w-full  bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all sm:text-sm" id="password" name="password" placeholder="••••••••" required type="password" />
+                                    <input className="block w-full  bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all sm:text-sm" id="password" name="password" placeholder="••••••••" required type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
                                 </div>
                             </div>
 
                             {/* Remember Me */}
                             <div className="flex items-center">
-                                <input className="h-4 w-4 text-primary focus:ring-primary border-slate-300 rounded cursor-pointer" id="remember-me" name="remember-me" type="checkbox" />
+                                <input className="h-4 w-4 text-primary focus:ring-primary border-slate-300 rounded cursor-pointer" id="remember-me" name="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
                                 <label className="ml-2 block text-sm text-slate-600 dark:text-slate-400 cursor-pointer" htmlFor="remember-me">
                                     Keep me logged in for 30 days
                                 </label>
                             </div>
 
                             {/* Login Button */}
-                            <button className="w-full flex justify-center py-3 px-4 rounded-xl shadow-sm text-sm font-semibold text-background-dark bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all transform active:scale-[0.98]" type="submit">
-                                Sign In to Dashboard
+                            <button className="w-full flex justify-center py-3 px-4 rounded-xl shadow-sm text-sm font-semibold text-background-dark bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={isLoading}>
+                                {isLoading ? 'Signing In...' : 'Sign In to Dashboard'}
                             </button>
                         </form>
 

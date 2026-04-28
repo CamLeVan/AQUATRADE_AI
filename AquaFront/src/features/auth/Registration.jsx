@@ -1,7 +1,67 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../../services/api';
 
 const Registration = () => {
+    const navigate = useNavigate();
+    
+    // State cho form
+    const [fullName, setFullName] = useState('');
+    const [companyName, setCompanyName] = useState('');
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState('');
+    const [password, setPassword] = useState('');
+    const [agreeTerms, setAgreeTerms] = useState(false);
+    
+    // State cho UI
+    const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccessMsg('');
+
+        if (!agreeTerms) {
+            setError('Bạn cần đồng ý với Điều khoản dịch vụ.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const response = await api.post('/auth/register', {
+                fullName,
+                companyName,
+                email,
+                role: role.toUpperCase(), // backend cần BUYER, SELLER
+                password
+            });
+
+            if (response.data.status === 'success') {
+                const { token, refreshToken, role: userRole, userId } = response.data.data;
+                
+                // Tự động đăng nhập luôn sau khi đăng ký thành công
+                localStorage.setItem('accessToken', token);
+                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem('userRole', userRole);
+                localStorage.setItem('userId', userId);
+
+                setSuccessMsg('Đăng ký thành công! Đang chuyển hướng...');
+                setTimeout(() => {
+                    navigate('/'); // Trở về trang chủ (Dashboard)
+                }, 1500);
+            } else {
+                setError(response.data.message || 'Đăng ký thất bại.');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Có lỗi xảy ra khi kết nối máy chủ.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="bg-background-light dark:bg-background-dark font-display min-h-screen">
             <div className="flex min-h-screen">
@@ -78,6 +138,17 @@ const Registration = () => {
                         <div className="mb-10">
                             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Create Account</h2>
                             <p className="text-slate-500 dark:text-slate-400">Join our global seafood ecosystem today.</p>
+                            
+                            {error && (
+                                <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+                                    {error}
+                                </div>
+                            )}
+                            {successMsg && (
+                                <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+                                    {successMsg}
+                                </div>
+                            )}
                         </div>
 
                         {/* Progress Indicator */}
@@ -87,27 +158,27 @@ const Registration = () => {
                             <div className="h-1.5 flex-1 bg-primary/20 rounded-full dark:bg-primary/10"></div>
                         </div>
 
-                        <form className="space-y-6">
+                        <form className="space-y-6" onSubmit={handleRegister}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
-                                    <input className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="Thanh Long" type="text" />
+                                    <input className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="Thanh Long" type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Company Name</label>
-                                    <input className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="FPT Software" type="text" />
+                                    <input className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="FPT Software" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Business Email</label>
                                 <div className="relative">
-                                    <input className="w-full  rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="long27fpt@company.com" type="email" />
+                                    <input className="w-full  rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="long27fpt@company.com" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
                                 </div>
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">User Role</label>
                                 <div className="relative">
-                                    <select defaultValue="" className="w-full px-4 py-3 appearance-none rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus cursor-pointer">
+                                    <select required className="w-full px-4 py-3 appearance-none rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus cursor-pointer" value={role} onChange={(e) => setRole(e.target.value)}>
                                         <option disabled value="">Select your role</option>
                                         <option value="buyer">Buyer / Distributor</option>
                                         <option value="seller">Seller / Producer</option>
@@ -119,7 +190,7 @@ const Registration = () => {
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
                                 <div className="relative">
-                                    <input className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="••••••••" type="password" />
+                                    <input className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:text-white form-input-focus placeholder:text-slate-400" placeholder="••••••••" type="password" required minLength="8" value={password} onChange={(e) => setPassword(e.target.value)} />
                                     <button className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors" type="button">
                                         <span className="material-icons text-lg">visibility_off</span>
                                     </button>
@@ -128,14 +199,14 @@ const Registration = () => {
                             </div>
                             <div className="flex items-start gap-3">
                                 <div className="flex items-center h-5">
-                                    <input className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary" type="checkbox" />
+                                    <input className="h-4 w-4 rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary" type="checkbox" checked={agreeTerms} onChange={(e) => setAgreeTerms(e.target.checked)} />
                                 </div>
                                 <label className="text-sm text-slate-500 dark:text-slate-400 leading-tight">
                                     I agree to the <Link to="/" className="text-primary hover:underline font-medium">Terms of Service</Link> and <Link to="/" className="text-primary hover:underline font-medium">Privacy Policy</Link>.
                                 </label>
                             </div>
-                            <button className="w-full bg-primary hover:bg-opacity-90 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2" type="submit">
-                                <span>Create Account</span>
+                            <button className="w-full bg-primary hover:bg-opacity-90 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={isLoading}>
+                                <span>{isLoading ? 'Creating Account...' : 'Create Account'}</span>
                             </button>
                         </form>
 

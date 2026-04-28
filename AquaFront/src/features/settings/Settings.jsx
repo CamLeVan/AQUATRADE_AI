@@ -131,7 +131,7 @@ const Settings = () => {
                                     <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline p-6 flex items-center justify-between group hover:bg-surface-container transition-colors cursor-pointer">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-xl bg-cyan-50 flex items-center justify-center text-primary">
-                                                <span className="material-symbols-outlined font-icon" style={{fontVariationSettings: "'FILL' 1"}}>verified_user</span>
+                                                <span className="material-symbols-outlined font-icon" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
                                             </div>
                                             <div>
                                                 <h5 className="text-sm font-bold text-slate-800">Xác thực 2 lớp (2FA)</h5>
@@ -245,7 +245,7 @@ const Settings = () => {
                                     <div className="absolute top-[-20%] right-[-10%] w-48 h-48 bg-primary/20 rounded-full blur-3xl"></div>
                                     <div className="flex justify-between items-start mb-10">
                                         <span className="text-[10px] font-black tracking-widest uppercase text-primary">Aqua Wallet</span>
-                                        <span className="material-symbols-outlined text-primary font-icon" style={{fontVariationSettings: "'FILL' 1"}}>account_balance_wallet</span>
+                                        <span className="material-symbols-outlined text-primary font-icon" style={{ fontVariationSettings: "'FILL' 1" }}>account_balance_wallet</span>
                                     </div>
                                     <div className="mb-6">
                                         <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 opacity-70">Balance</p>
@@ -301,7 +301,7 @@ const Settings = () => {
                     </div>
 
                     {/* Footer Section */}
-                 <Footer />
+                    <Footer />
                 </main>
             </div>
         </div>
