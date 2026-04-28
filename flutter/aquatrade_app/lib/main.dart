@@ -15,6 +15,8 @@ import 'providers/auth_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/wallet_provider.dart';
 import 'providers/post_provider.dart';
+import 'providers/ai_provider.dart';
+import 'providers/kyc_provider.dart';
 
 import 'screens/root_screen.dart';
 
@@ -31,11 +33,9 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   }
 
-  // 1. Initialize Global ApiService (Dio + Interceptors)
   final apiService = ApiService();
   final localService = LocalService();
 
-  // 2. Initialize Repositories
   final authRepository = AuthRepository(apiService);
   final listingRepository = ListingRepository(apiService, localService);
   final orderRepository = OrderRepository(apiService, localService);
@@ -52,6 +52,8 @@ void main() {
         ChangeNotifierProvider(create: (_) => OrderProvider(orderRepository)),
         ChangeNotifierProvider(create: (_) => WalletProvider(walletRepository)),
         ChangeNotifierProvider(create: (_) => PostProvider(postRepository)),
+        ChangeNotifierProvider(create: (_) => AiProvider()),
+        ChangeNotifierProvider(create: (_) => KycProvider()),
       ],
       child: const AquaTradeApp(),
     ),

@@ -18,7 +18,6 @@ class ApiService {
       baseUrl: kIsWeb ? 'http://localhost:8080/api/v1' : 'http://10.0.2.2:8080/api/v1',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
-      // sendTimeout: const Duration(seconds: 10), // Gây lỗi trên Web cho requests không body
       headers: {'Content-Type': 'application/json'},
     ),
   );
@@ -194,38 +193,47 @@ class ApiService {
     return payload['data'] as T;
   }
 
+  Future<Response<dynamic>> _requestWithRetry(Future<Response<dynamic>> Function() request) async {
+    int maxRetries = 3;
+    int attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        return await request();
+      } on DioException catch (e) {
+        attempt++;
+        final isNetworkError = e.type == DioExceptionType.connectionTimeout || 
+                               e.type == DioExceptionType.connectionError ||
+                               e.type == DioExceptionType.receiveTimeout;
+                               
+        if (isNetworkError && attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+          continue;
+        }
+        throw ApiException(_mapError(e), statusCode: e.response?.statusCode);
+      } catch (e) {
+        throw ApiException('Lỗi hệ thống: ${e.toString()}');
+      }
+    }
+    throw const ApiException('Không thể kết nối sau nhiều lần thử.');
+  }
+
   Future<Response<dynamic>> get(
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
-    try {
-      return await _dio.get<dynamic>(path, queryParameters: queryParameters);
-    } on DioException catch (e) {
-      throw ApiException(_mapError(e), statusCode: e.response?.statusCode);
-    }
+    return _requestWithRetry(() => _dio.get<dynamic>(path, queryParameters: queryParameters));
   }
 
   Future<Response<dynamic>> post(String path, {dynamic data}) async {
-    try {
-      return await _dio.post<dynamic>(path, data: data);
-    } on DioException catch (e) {
-      throw ApiException(_mapError(e), statusCode: e.response?.statusCode);
-    }
+    return _requestWithRetry(() => _dio.post<dynamic>(path, data: data));
   }
 
   Future<Response<dynamic>> put(String path, {dynamic data}) async {
-    try {
-      return await _dio.put<dynamic>(path, data: data);
-    } on DioException catch (e) {
-      throw ApiException(_mapError(e), statusCode: e.response?.statusCode);
-    }
+    return _requestWithRetry(() => _dio.put<dynamic>(path, data: data));
   }
 
   Future<Response<dynamic>> delete(String path) async {
-    try {
-      return await _dio.delete<dynamic>(path);
-    } on DioException catch (e) {
-      throw ApiException(_mapError(e), statusCode: e.response?.statusCode);
-    }
+    return _requestWithRetry(() => _dio.delete<dynamic>(path));
   }
 }

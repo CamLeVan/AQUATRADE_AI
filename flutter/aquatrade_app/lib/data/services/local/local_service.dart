@@ -6,7 +6,7 @@ class LocalService {
   static Database? _database;
 
   Future<Database?> get database async {
-    if (kIsWeb) return null; // SQLite is not supported on Web out-of-the-box
+    if (kIsWeb) return null;
     if (_database != null) return _database!;
     _database = await _initDB('aquatrade.db');
     return _database!;
@@ -24,7 +24,6 @@ class LocalService {
   }
 
   Future _createDB(Database db, int version) async {
-    // 1. Listings Table
     await db.execute('''
       CREATE TABLE listings (
         id TEXT PRIMARY KEY,
@@ -44,7 +43,6 @@ class LocalService {
       )
     ''');
 
-    // 2. Orders Table
     await db.execute('''
       CREATE TABLE orders (
         id TEXT PRIMARY KEY,
@@ -60,7 +58,6 @@ class LocalService {
       )
     ''');
 
-    // 3. Posts Table
     await db.execute('''
       CREATE TABLE posts (
         id TEXT PRIMARY KEY,
@@ -75,7 +72,6 @@ class LocalService {
     ''');
   }
 
-  // --- Listings ---
   Future<void> saveListings(List<Map<String, dynamic>> maps) async {
     final db = await database;
     if (db == null) return;

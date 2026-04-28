@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../data/models/auth_model.dart';
 import 'global_ai_trading/marketplace_screen.dart';
 import 'global_ai_trading/portfolio_dashboard_screen.dart';
 import 'global_ai_trading/wallet_funding_screen.dart';
 import 'global_ai_trading/settings_screen.dart';
 import 'global_ai_trading/news_feed_screen.dart';
+import 'global_ai_trading/create_listing_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -27,8 +29,14 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final bool isSeller = auth.currentUser?.role == Role.SELLER;
+
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -40,30 +48,42 @@ class _MainScreenState extends State<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.store_outlined),
             selectedIcon: Icon(Icons.store),
-            label: 'Chợ',
+            label: 'Market',
           ),
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Danh mục',
+            icon: Icon(Icons.pie_chart_outline),
+            selectedIcon: Icon(Icons.pie_chart),
+            label: 'Portfolio',
           ),
           NavigationDestination(
             icon: Icon(Icons.newspaper_outlined),
             selectedIcon: Icon(Icons.newspaper),
-            label: 'Tin tức',
+            label: 'News',
           ),
           NavigationDestination(
             icon: Icon(Icons.wallet_outlined),
             selectedIcon: Icon(Icons.wallet),
-            label: 'Ví',
+            label: 'Wallet',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'Cài đặt',
+            label: 'Settings',
           ),
         ],
       ),
+      // Hiển thị nút đăng bán chỉ dành cho Seller và khi đang ở tab Market
+      floatingActionButton: (isSeller && _selectedIndex == 0)
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CreateListingScreen()),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Post Sale'),
+            )
+          : null,
     );
   }
 }

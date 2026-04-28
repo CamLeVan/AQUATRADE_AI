@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screen_scaffold.dart';
+import '../root_screen.dart';
 
 class OnboardingFlowScreen extends StatefulWidget {
   const OnboardingFlowScreen({super.key});
@@ -34,13 +36,17 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             ),
             const Spacer(),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 if (_index < 2) {
                   _page.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Onboarding completed (demo).')),
-                  );
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('is_first_time', false);
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const RootScreen()),
+                    );
+                  }
                 }
               },
               child: Text(_index < 2 ? 'Next' : 'Finish'),

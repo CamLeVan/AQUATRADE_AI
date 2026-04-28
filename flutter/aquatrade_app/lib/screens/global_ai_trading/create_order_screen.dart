@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/order_provider.dart';
 import 'screen_scaffold.dart';
+import 'risk_controls_screen.dart';
 
 class CreateOrderScreen extends StatefulWidget {
   const CreateOrderScreen({super.key, this.initialListingId});
@@ -143,19 +144,28 @@ class _HintCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Icon(Icons.lightbulb_outline),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Tip: use Risk Controls to set max loss and position limits before trading.',
-                style: theme.textTheme.bodyMedium,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const RiskControlsScreen()),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.lightbulb_outline),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tip: use Risk Controls to set max loss and position limits before trading.',
+                  style: theme.textTheme.bodyMedium,
+                ),
               ),
-            ),
-          ],
+              const Icon(Icons.arrow_forward_ios, size: 16),
+            ],
+          ),
         ),
       ),
     );

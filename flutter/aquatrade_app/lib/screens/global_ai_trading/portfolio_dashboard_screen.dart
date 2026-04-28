@@ -4,7 +4,12 @@ import 'package:intl/intl.dart';
 
 import '../../providers/wallet_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../data/models/auth_model.dart';
 import 'screen_scaffold.dart';
+import 'kyc_verification_screen.dart';
+import 'exchange_screen.dart';
+import 'trade_tickets_screen.dart';
 
 class PortfolioDashboardScreen extends StatefulWidget {
   const PortfolioDashboardScreen({super.key});
@@ -27,9 +32,11 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final currencyFormat = NumberFormat("#,###");
+    final auth = context.watch<AuthProvider>();
+    final isSeller = auth.currentUser?.role == Role.SELLER;
 
     return ScreenScaffold(
-      title: 'Portfolio Dashboard',
+      title: isSeller ? 'Seller Dashboard' : 'Investment Portfolio',
       actions: [
         IconButton(
           onPressed: () {
@@ -51,18 +58,34 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Total equity', style: theme.textTheme.bodySmall),
+                      Text(
+                        isSeller ? 'Total Sales Revenue' : 'Available Balance',
+                        style: theme.textTheme.bodySmall,
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         '₫${currencyFormat.format(balance)}',
-                        style: theme.textTheme.headlineSmall,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: isSeller ? Colors.green : theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 10),
-                      const Row(
+                      Row(
                         children: [
-                          Expanded(child: _Pill(label: 'Day P/L', value: '+₫0')),
-                          SizedBox(width: 8),
-                          Expanded(child: _Pill(label: 'Exposure', value: '100%')),
+                          Expanded(
+                            child: _Pill(
+                              label: isSeller ? 'Pending Payout' : 'Daily Change',
+                              value: isSeller ? '₫0' : '+0.0%',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _Pill(
+                              label: isSeller ? 'Active Listings' : 'Exposure',
+                              value: isSeller ? '0 items' : '100%',
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -72,7 +95,24 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
             },
           ),
           const SizedBox(height: 16),
-          Text('Recent Orders', style: theme.textTheme.titleMedium),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const KycVerificationScreen()),
+              );
+            },
+            icon: const Icon(Icons.verified_user),
+            label: const Text('Xác thực danh tính (KYC)'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            isSeller ? 'Order Fulfillment' : 'Recent Purchases',
+            style: theme.textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           Consumer<OrderProvider>(
             builder: (context, orderProv, _) {
@@ -100,10 +140,24 @@ class _PortfolioDashboardScreenState extends State<PortfolioDashboardScreen> {
             },
           ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.analytics_outlined),
-            label: const Text('View Full Analytics'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ExchangeScreen())),
+                  icon: const Icon(Icons.currency_exchange),
+                  label: const Text('Exchange'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TradeTicketsScreen())),
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Trade Tickets'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

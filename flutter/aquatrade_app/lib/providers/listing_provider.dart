@@ -45,4 +45,22 @@ class ListingProvider with ChangeNotifier {
       return null;
     }
   }
+
+  Future<void> createListing(ListingModel listing) async {
+    _state = ListingState.loading;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      final newListing = await _repository.createListing(listing);
+      _listings.insert(0, newListing);
+      _state = ListingState.success;
+    } catch (e) {
+      _state = ListingState.error;
+      _errorMessage = e.toString();
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
 }

@@ -4,6 +4,9 @@ import '../../providers/listing_provider.dart';
 import '../../data/models/listing_model.dart';
 import 'package:intl/intl.dart';
 import 'create_order_screen.dart';
+import 'asset_detail_screen.dart';
+import 'market_trends_screen.dart';
+import 'content_hub_screen.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -28,6 +31,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       appBar: AppBar(
         title: const Text('AquaTrade Marketplace'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.trending_up),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MarketTrendsScreen())),
+          ),
+          IconButton(
+            icon: const Icon(Icons.article_outlined),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ContentHubScreen())),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<ListingProvider>().fetchListings(),
@@ -177,7 +188,7 @@ class _ListingCard extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => CreateOrderScreen(initialListingId: listing.id),
+                            builder: (_) => AssetDetailScreen(listing: listing),
                           ),
                         );
                       },

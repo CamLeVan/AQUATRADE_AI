@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screen_scaffold.dart';
+import 'user_directory_screen.dart';
 
 class AdminConsoleScreen extends StatefulWidget {
   const AdminConsoleScreen({super.key});
@@ -65,6 +66,16 @@ class _AdminConsoleScreenState extends State<AdminConsoleScreen> {
                   title: const Text('Auto-approve low-risk content'),
                   subtitle: const Text('Applies to verified accounts'),
                   secondary: const Icon(Icons.auto_awesome),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.people_alt_outlined),
+                  title: const Text('User Directory'),
+                  subtitle: const Text('Manage user accounts and roles'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UserDirectoryScreen()));
+                  },
                 ),
               ],
             ),

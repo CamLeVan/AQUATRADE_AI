@@ -13,17 +13,13 @@ class ListingRepository {
     String? species,
     bool forceRefresh = false,
   }) async {
-    // 1. Try to get from local if not forcing refresh
     if (!forceRefresh) {
       final cachedJson = await _localService.getCachedListings();
       if (cachedJson.isNotEmpty) {
-        // Return cached data immediately (UI will be fast)
-        // Note: In a real app, you might still want to trigger a background fetch
         return cachedJson.map((json) => ListingModel.fromJson(json)).toList();
       }
     }
 
-    // 2. Fetch from Remote
     final response = await _apiService.get(
       '/listings',
       queryParameters: {
@@ -34,7 +30,6 @@ class ListingRepository {
     final List<dynamic> data = _apiService.parseData<List<dynamic>>(response);
     final listings = data.map((json) => ListingModel.fromJson(json)).toList();
 
-    // 3. Save to Local for next time
     await _localService.saveListings(listings.map((e) => e.toJson()).toList());
 
     return listings;
