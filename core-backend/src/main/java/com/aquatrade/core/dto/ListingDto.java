@@ -1,16 +1,14 @@
 package com.aquatrade.core.dto;
 
+import lombok.*;
 import com.aquatrade.core.domain.enums.ListingCategory;
 import com.aquatrade.core.domain.enums.ListingStatus;
-import lombok.Builder;
-import lombok.Data;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class ListingDto {
     private String id;
@@ -33,29 +31,18 @@ public class ListingDto {
     private LocalDateTime createdAt;
 
     @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
     public static class CreateListingRequest {
-        @NotBlank(message = "Title required")
         private String title;
-        
-        @NotNull
         private ListingCategory category;
-        
-        @NotBlank
         private String species;
-        
-        @NotBlank
         private String province;
-        
-        @Positive
         private BigDecimal sizeMin;
-        
-        @Positive
         private BigDecimal sizeMax;
-        
-        @NotNull @Positive
         private BigDecimal pricePerFish;
-        
-        @NotNull @Positive
         private Integer estimatedQuantity;
+        private String thumbnailUrl;
     }
 }

@@ -1,13 +1,128 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import AdminLayout from './layout/AdminLayout';
+import api from '../../services/api';
 
 const AdminDashboard = () => {
     const [user, setUser] = useState({ fullName: '', role: '' });
+    const [pendingListings, setPendingListings] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    const [selectedListing, setSelectedListing] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [stats, setStats] = useState({
+        totalRevenue: 0,
+        totalUsers: 0,
+        openDisputes: 0,
+        aiAccuracy: 99.98,
+        activeListings: 0
+    });
+    const [sellerStats, setSellerStats] = useState({
+        totalSales: 0,
+        totalListings: 0,
+        pendingOrders: 0,
+        shopRating: 4.9
+    });
     
     useEffect(() => {
         const storedUser = JSON.parse(localStorage.getItem('user')) || {};
         setUser(storedUser);
+        
+        if (storedUser.role === 'ADMIN') {
+            fetchPendingListings();
+            fetchUsers();
+            fetchStats();
+        } else if (storedUser.role === 'SELLER') {
+            fetchSellerStats(storedUser.userId);
+        }
     }, []);
+
+    const fetchStats = async () => {
+        try {
+            const response = await api.get('/admin/stats');
+            if (response.data.status === 'success') {
+                console.log("Admin Stats Received:", response.data.data);
+                setStats(response.data.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch admin stats", error);
+        }
+    };
+
+    const fetchSellerStats = async (sellerId) => {
+        try {
+            const response = await api.get(`/seller/${sellerId}/stats`);
+            if (response.data.status === 'success') {
+                console.log("Seller Stats Received:", response.data.data);
+                setSellerStats(response.data.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch seller stats", error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const response = await api.get('/admin/users');
+            if (response.data.status === 'success') {
+                setUsers(response.data.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch users", error);
+        }
+    };
+
+    const fetchPendingListings = async () => {
+        setIsLoading(true);
+        try {
+            const response = await api.get('/admin/listings/pending');
+            if (response.data.status === 'success') {
+                setPendingListings(response.data.data.slice(0, 3));
+            }
+        } catch (error) {
+            console.error("Failed to fetch pending listings", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleToggleUserStatus = async (userId, isActive) => {
+        try {
+            const response = await api.put(`/admin/users/${userId}/status`, {
+                newStatus: isActive ? 'INACTIVE' : 'ACTIVE'
+            });
+            if (response.data.status === 'success') {
+                alert(isActive ? 'Đã khóa tài khoản!' : 'Đã mở khóa tài khoản!');
+                fetchUsers();
+                fetchStats(); // Cập nhật lại con số tổng quan
+            }
+        } catch (error) {
+            alert('Lỗi: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleModerate = async (id, status) => {
+        let note = '';
+        if (status === 'REJECTED') {
+            note = prompt('Lý do từ chối sản phẩm này:');
+            if (!note) return;
+        }
+
+        try {
+            const response = await api.put(`/admin/listings/${id}/moderate`, {
+                moderationStatus: status,
+                moderationNote: note
+            });
+            if (response.data.status === 'success') {
+                alert(status === 'AVAILABLE' ? 'Đã phê duyệt sản phẩm!' : 'Đã từ chối sản phẩm.');
+                setSelectedListing(null);
+                fetchPendingListings();
+                fetchStats(); // Cập nhật lại con số tổng quan (ví dụ: số sản phẩm đang bán)
+            }
+        } catch (error) {
+            alert('Có lỗi xảy ra: ' + (error.response?.data?.message || error.message));
+        }
+    };
 
     const isAdmin = user.role === 'ADMIN';
 
@@ -66,19 +181,17 @@ const AdminDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {isAdmin ? (
                         <>
-                            {/* Admin Stats */}
-                            <StatCard title="Tổng doanh thu" value="$1,284,000" trend="+12.5%" icon="payments" color="teal" />
-                            <StatCard title="Người dùng hoạt động" value="42.5k" trend="+4.2%" icon="person_play" color="cyan" />
-                            <StatCard title="Tranh chấp mở" value="18" trend="-2" icon="gavel" color="red" />
-                            <StatCard title="Độ chính xác AI" value="99.98%" trend="Stable" icon="psychology" color="teal" />
+                            <StatCard title="Tổng doanh thu" value={`${(stats?.totalRevenue || 0).toLocaleString()}đ`} trend="+12.5%" icon="payments" color="teal" />
+                            <StatCard title="Người dùng hệ thống" value={(stats?.totalUsers || 0).toLocaleString()} trend="+4.2%" icon="person_play" color="cyan" />
+                            <StatCard title="Tranh chấp mở" value={(stats?.openDisputes || 0).toString()} trend={(stats?.openDisputes || 0) > 5 ? "Cần xử lý" : "Ổn định"} icon="gavel" color={(stats?.openDisputes || 0) > 5 ? "red" : "teal"} />
+                            <StatCard title="Sản phẩm đang bán" value={(stats?.activeListings || 0).toLocaleString()} trend="Live" icon="inventory_2" color="teal" />
                         </>
                     ) : (
                         <>
-                            {/* Seller Stats */}
-                            <StatCard title="Doanh số của tôi" value="125,000,000đ" trend="+18%" icon="trending_up" color="teal" />
-                            <StatCard title="Sản phẩm đăng bán" value="42" trend="3 mới" icon="inventory_2" color="cyan" />
-                            <StatCard title="Đơn hàng chờ" value="12" trend="Cần xử lý" icon="local_shipping" color="orange" />
-                            <StatCard title="Đánh giá Shop" value="4.9/5" trend="98 feedback" icon="star" color="yellow" />
+                            <StatCard title="Doanh số của tôi" value={`${(sellerStats?.totalSales || 0).toLocaleString()}đ`} trend="+18%" icon="trending_up" color="teal" />
+                            <StatCard title="Sản phẩm đăng bán" value={(sellerStats?.totalListings || 0).toString()} trend="Live" icon="inventory_2" color="cyan" />
+                            <StatCard title="Đơn hàng của tôi" value={(sellerStats?.pendingOrders || 0).toString()} trend="Cần xử lý" icon="local_shipping" color="orange" />
+                            <StatCard title="Đánh giá Shop" value={`${sellerStats?.shopRating || 0}/5`} trend="98 feedback" icon="star" color="yellow" />
                         </>
                     )}
                 </div>
@@ -94,12 +207,36 @@ const AdminDashboard = () => {
                                 <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Dữ liệu phân tích thời gian thực</p>
                             </div>
                         </div>
-                        <div className="h-64 flex items-end gap-1 px-2">
-                            {[30, 45, 35, 60, 80, 75, 90, 85, 70, 95].map((h, i) => (
-                                <div key={i} className={`flex-1 bg-[#13ecc8]/${i === 9 ? '100' : '20'} rounded-t-sm h-[${h}%] hover:bg-[#13ecc8] transition-all cursor-pointer`} style={{ height: `${h}%` }}>
-                                    {i === 9 && <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded">245</div>}
+                        <div className="h-64 flex items-end gap-1 px-2 relative">
+                            {stats.dailyStats && stats.dailyStats.length > 0 ? (() => {
+                                const maxVal = Math.max(...stats.dailyStats.map(s => s.value), 1);
+                                return stats.dailyStats.map((s, i) => {
+                                    const heightPercent = (s.value / maxVal) * 100;
+                                    const isLast = i === stats.dailyStats.length - 1;
+                                    return (
+                                        <div 
+                                            key={i} 
+                                            className={`flex-1 relative group bg-[#13ecc8]/${isLast ? '100' : '20'} rounded-t-sm hover:bg-[#13ecc8] transition-all cursor-pointer`} 
+                                            style={{ height: `${Math.max(heightPercent, 5)}%` }}
+                                            title={`${s.date}: ${s.value} đơn hàng`}
+                                        >
+                                            {/* Tooltip on hover */}
+                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                                                {s.value} đơn
+                                            </div>
+                                            {isLast && (
+                                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                                    {s.value}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })() : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs italic">
+                                    Đang khởi tạo dữ liệu biểu đồ...
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
 
@@ -110,14 +247,51 @@ const AdminDashboard = () => {
                         </h3>
                         <div className="flex-1 space-y-4">
                             {isAdmin ? (
-                                <PendingItems />
+                                <div className="space-y-4">
+                                    {isLoading ? (
+                                        <p className="text-xs text-slate-400 animate-pulse">Đang tải danh sách chờ...</p>
+                                    ) : pendingListings.length > 0 ? (
+                                        pendingListings.map((item) => (
+                                            <div 
+                                                key={item.id} 
+                                                className="flex gap-4 items-center p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 cursor-pointer group"
+                                                onClick={() => setSelectedListing(item)}
+                                            >
+                                                <img src={item.imageUrl || 'https://via.placeholder.com/100'} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-100" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-bold text-slate-800 truncate group-hover:text-cyan-600 transition-colors">{item?.title}</p>
+                                                    <p className="text-[10px] text-[#13ecc8] font-bold uppercase">Price: {(item?.price || 0).toLocaleString()}đ</p>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleModerate(item.id, 'AVAILABLE'); }}
+                                                        className="p-1 text-[#00cfa8] bg-[#13ecc8]/5 hover:bg-[#13ecc8]/20 rounded transition-colors"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleModerate(item.id, 'REJECTED'); }}
+                                                        className="p-1 text-red-500 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">cancel</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <span className="material-symbols-outlined text-slate-200 text-4xl mb-2">inventory</span>
+                                            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Không có sản phẩm chờ duyệt</p>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <SellerNotifications />
                             )}
                         </div>
-                        <button className="mt-6 w-full text-[10px] font-bold uppercase tracking-widest text-cyan-600 hover:text-cyan-400 py-2 transition-colors">
-                            {isAdmin ? 'Xem tất cả yêu cầu' : 'Xem tất cả thông báo'}
-                        </button>
+                        <Link to={isAdmin ? "/admin/marketplace" : "#"} className="mt-6 w-full text-center text-[10px] font-bold uppercase tracking-widest text-cyan-600 hover:text-cyan-400 py-2 transition-colors border-t border-slate-50 pt-4">
+                            {isAdmin ? 'Quản lý Marketplace' : 'Xem tất cả thông báo'}
+                        </Link>
                     </div>
                 </div>
 
@@ -134,25 +308,71 @@ const AdminDashboard = () => {
                         </div>
                         <button className="px-4 py-2 border border-slate-200 text-cyan-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm bg-white">Xuất báo cáo</button>
                     </div>
-                    {isAdmin ? <UserTable /> : <SellerOrderTable />}
+                    {isAdmin ? <UserTable users={users} onToggleStatus={handleToggleUserStatus} /> : <SellerOrderTable />}
                 </div>
 
-                {/* Footer */}
-                <footer className="w-full border-t border-slate-200 bg-white flex flex-col md:flex-row justify-between items-center px-8 py-6 gap-4 rounded-xl shadow-sm mt-8">
-                    <div className="flex flex-col md:flex-row items-center gap-6">
-                        <p className="text-[11px] font-bold tracking-wider uppercase text-slate-400">© 2024 Aqua Crystal AI. {isAdmin ? 'System Administrator' : 'Merchant Panel'}</p>
+                {/* Product Detail Modal */}
+                {selectedListing && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="relative h-64 bg-slate-100">
+                                <img src={selectedListing.imageUrl || 'https://via.placeholder.com/600x400'} alt="" className="w-full h-full object-cover" />
+                                <button 
+                                    onClick={() => setSelectedListing(null)}
+                                    className="absolute top-4 right-4 w-10 h-10 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center transition-all"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
+                                    <h3 className="text-2xl font-black uppercase tracking-tight">{selectedListing.title}</h3>
+                                    <p className="text-sm font-medium opacity-80">Đăng bởi: {selectedListing.sellerName || 'Người bán ẩn danh'}</p>
+                                </div>
+                            </div>
+                            <div className="p-8 space-y-6">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Giá bán</p>
+                                        <p className="text-lg font-bold text-cyan-600">{(selectedListing?.price || 0).toLocaleString()}đ</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Danh mục</p>
+                                        <p className="text-lg font-bold text-slate-800">{selectedListing.category || 'Hải sản'}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Số lượng</p>
+                                        <p className="text-lg font-bold text-slate-800">{selectedListing.quantity || 1} {selectedListing.unit || 'kg'}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Mô tả sản phẩm</p>
+                                    <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 italic">
+                                        "{selectedListing.description || 'Không có mô tả chi tiết cho sản phẩm này.'}"
+                                    </p>
+                                </div>
+                                <div className="flex gap-4 pt-4">
+                                    <button 
+                                        onClick={() => handleModerate(selectedListing.id, 'REJECTED')}
+                                        className="flex-1 py-4 bg-red-50 text-red-600 font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-red-100 transition-all active:scale-95 border border-red-100"
+                                    >
+                                        Từ chối đăng tải
+                                    </button>
+                                    <button 
+                                        onClick={() => handleModerate(selectedListing.id, 'AVAILABLE')}
+                                        className="flex-[2] py-4 bg-[#13ecc8] text-slate-900 font-black uppercase tracking-widest text-xs rounded-2xl hover:brightness-110 shadow-lg shadow-[#13ecc8]/20 transition-all active:scale-95"
+                                    >
+                                        Phê duyệt ngay
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                        <span className="material-symbols-outlined text-[#13ecc8] text-sm">shield</span>
-                        <span className="text-[10px] font-bold tracking-widest uppercase text-slate-500">Security: Tier 1 Encrypted</span>
-                    </div>
-                </footer>
+                )}
             </div>
         </AdminLayout>
     );
 };
 
-// --- Sub-components for cleaner code ---
+// --- Sub-components ---
 
 const StatCard = ({ title, value, trend, icon, color }) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
@@ -174,28 +394,6 @@ const StatCard = ({ title, value, trend, icon, color }) => (
     </div>
 );
 
-const PendingItems = () => (
-    <>
-        {[
-            { name: 'Tôm Thẻ Sóc Trăng', ai: '98%', img: 'https://images.unsplash.com/photo-1553659971-f01207815844?auto=format&fit=crop&q=80&w=100' },
-            { name: 'Cá Tra An Giang', ai: '92%', img: 'https://images.unsplash.com/photo-1553659971-f01207815844?auto=format&fit=crop&q=80&w=100' },
-            { name: 'Mực Lá Phú Quốc', ai: '87%', img: 'https://images.unsplash.com/photo-1553659971-f01207815844?auto=format&fit=crop&q=80&w=100' }
-        ].map((item, i) => (
-            <div key={i} className="flex gap-4 items-center p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 cursor-pointer">
-                <img src={item.img} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">{item.name}</p>
-                    <p className="text-[10px] text-[#13ecc8] font-bold uppercase">AI Confidence: {item.ai}</p>
-                </div>
-                <div className="flex gap-1">
-                    <button className="p-1 text-[#00cfa8] bg-[#13ecc8]/5 rounded"><span className="material-symbols-outlined text-sm">check_circle</span></button>
-                    <button className="p-1 text-red-500 bg-red-50 rounded"><span className="material-symbols-outlined text-sm">cancel</span></button>
-                </div>
-            </div>
-        ))}
-    </>
-);
-
 const SellerNotifications = () => (
     <>
         <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl">
@@ -209,7 +407,7 @@ const SellerNotifications = () => (
     </>
 );
 
-const UserTable = () => (
+const UserTable = ({ users, onToggleStatus }) => (
     <table className="w-full text-left min-w-[800px]">
         <thead>
             <tr className="bg-slate-50">
@@ -220,12 +418,52 @@ const UserTable = () => (
             </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-            <tr>
-                <td className="px-8 py-4 text-sm font-bold">Duong Dinh</td>
-                <td className="px-8 py-4 text-xs font-bold text-blue-600">SELLER</td>
-                <td className="px-8 py-4 text-xs font-bold text-[#13ecc8]">Active</td>
-                <td className="px-8 py-4 text-right"><button className="text-slate-400 material-symbols-outlined">more_vert</button></td>
-            </tr>
+            {users.length > 0 ? users.map((u) => (
+                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-8 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#13ecc8]/10 flex items-center justify-center text-[#00cfa8] font-bold text-xs uppercase">
+                                {u.fullName ? u.fullName.substring(0, 2) : '??'}
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{u.fullName || 'No Name'}</p>
+                                <p className="text-[11px] text-slate-400">{u.email}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td className="px-8 py-4">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest ${
+                            u.role === 'ADMIN' ? 'bg-purple-50 text-purple-600' :
+                            u.role === 'SELLER' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                            {u.role}
+                        </span>
+                    </td>
+                    <td className="px-8 py-4">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'ACTIVE' ? 'bg-[#13ecc8]' : 'bg-red-500'}`}></div>
+                            <span className="text-xs font-bold text-slate-600">
+                                {u.status === 'ACTIVE' ? 'Active' : u.status}
+                            </span>
+                        </div>
+                    </td>
+                    <td className="px-8 py-4 text-right">
+                        <button 
+                            onClick={() => onToggleStatus(u.id, u.status === 'ACTIVE')}
+                            className={`p-2 rounded-lg transition-colors ${u.status === 'ACTIVE' ? 'text-red-500 hover:bg-red-50' : 'text-[#13ecc8] hover:bg-[#13ecc8]/5'}`}
+                            title={u.status === 'ACTIVE' ? 'Block User' : 'Unblock User'}
+                        >
+                            <span className="material-symbols-outlined text-xl">
+                                {u.status === 'ACTIVE' ? 'block' : 'check_circle'}
+                            </span>
+                        </button>
+                    </td>
+                </tr>
+            )) : (
+                <tr>
+                    <td colSpan="4" className="px-8 py-10 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">Không có dữ liệu người dùng</td>
+                </tr>
+            )}
         </tbody>
     </table>
 );

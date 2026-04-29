@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ListingServiceImpl implements ListingService {
 
     private final ListingRepository listingRepository;
@@ -66,14 +68,35 @@ public class ListingServiceImpl implements ListingService {
                 .pricePerFish(request.getPricePerFish())
                 .estimatedQuantity(request.getEstimatedQuantity())
                 .availableQuantity(request.getEstimatedQuantity())
+                .thumbnailUrl(request.getThumbnailUrl())
                 .status(ListingStatus.PENDING_REVIEW)
                 .seller(seller)
                 .build();
 
-        listing = listingRepository.save(listing);
+        listing = listingRepository.saveAndFlush(listing);
         log.info("Listing mới: {} - Seller: {}", listing.getTitle(), seller.getFullName());
 
         return mapToDto(listing);
+    }
+
+    @Override
+    public List<ListingDto> getSellerListings(UUID sellerId) {
+        log.info(">>> Đang tìm danh sách bài đăng cho Seller ID: {}", sellerId);
+        List<Listing> results = listingRepository.findBySeller_Id(sellerId);
+        log.info(">>> Kết quả tìm kiếm: {} bài đăng cho Seller ID: {}", results.size(), sellerId);
+        
+        return results.stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public ListingDto updatePrice(UUID listingId, java.math.BigDecimal newPrice) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm"));
+        
+        listing.setPricePerFish(newPrice);
+        return mapToDto(listingRepository.save(listing));
     }
 
     private ListingDto mapToDto(Listing entity) {
@@ -88,9 +111,18 @@ public class ListingServiceImpl implements ListingService {
                 .pricePerFish(entity.getPricePerFish())
                 .estimatedQuantity(entity.getEstimatedQuantity())
                 .availableQuantity(entity.getAvailableQuantity())
+                .thumbnailUrl(entity.getThumbnailUrl())
                 .status(entity.getStatus())
                 .sellerName(entity.getSeller().getFullName())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    public void deleteListing(UUID id) {
+        Listing listing = listingRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tin đăng với ID: " + id));
+        listingRepository.delete(listing);
+        log.info("Đã xóa tin đăng ID: {}", id);
     }
 }

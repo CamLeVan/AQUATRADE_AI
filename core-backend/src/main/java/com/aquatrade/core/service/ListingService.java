@@ -8,4 +8,7 @@ public interface ListingService {
     List<ListingDto> getAllListings(String province, String species);
     ListingDto getListingById(UUID id);
     ListingDto createListing(ListingDto.CreateListingRequest request);
+    List<ListingDto> getSellerListings(UUID sellerId);
+    ListingDto updatePrice(UUID listingId, java.math.BigDecimal newPrice);
+    void deleteListing(UUID id);
 }

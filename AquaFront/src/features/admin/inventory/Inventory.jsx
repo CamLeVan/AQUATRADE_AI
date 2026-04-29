@@ -1,8 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layout/AdminLayout';
 import Footer from '../../../components/layout/Footer';
+import api from '../../../services/api';
 
 const Inventory = () => {
+    const [listings, setListings] = useState([]);
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [filterCategory, setFilterCategory] = useState('ALL');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [listingsRes, statsRes] = await Promise.all([
+                api.get('/admin/listings'),
+                api.get('/admin/stats')
+            ]);
+            setListings(listingsRes.data.data);
+            setStats(statsRes.data.data);
+        } catch (error) {
+            console.error('Lỗi khi tải dữ liệu Inventory:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    // Filter Logic
+    const filteredListings = listings.filter(l => 
+        filterCategory === 'ALL' || l.category === filterCategory
+    );
+
+    // Pagination Logic
+    const totalPages = Math.ceil(filteredListings.length / itemsPerPage);
+    const paginatedListings = filteredListings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const totalStock = listings.reduce((sum, l) => sum + (l.availableQuantity || 0), 0);
+    const lowStockCount = listings.filter(l => (l.availableQuantity || 0) < 50).length;
+
     return (
         <AdminLayout>
             <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto w-full">
@@ -10,269 +50,192 @@ const Inventory = () => {
                 <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
                     <div>
                         <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 font-headline">Phân Tích Kho Hàng</h2>
-                        <p className="text-slate-500 mt-1 uppercase tracking-widest text-[11px] font-semibold">Inventory Analytics • Real-time</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-slate-500">
-                        <button className="hover:text-cyan-500 transition-colors flex"><span className="material-icons-outlined">help_outline</span></button>
+                        <p className="text-slate-500 mt-1 uppercase tracking-widest text-[11px] font-semibold">Inventory Analytics • Real-time AI Tracking</p>
                     </div>
                 </section>
-                    {/* Dashboard Stats (Overview) */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Stat Card 1 */}
-                        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-primary/5 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">TỔNG TỒN KHO</p>
-                                <h3 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">2,450 <span className="text-sm font-medium text-slate-500">kg</span></h3>
-                                <p className="text-xs text-primary font-medium mt-2 flex items-center gap-1">
-                                    <span className="material-icons-outlined text-xs">trending_up</span> +12% so với tháng trước
-                                </p>
-                            </div>
-                            <div className="bg-primary-container p-4 rounded-xl">
-                                <span className="material-icons-outlined text-primary text-3xl">inventory</span>
-                            </div>
+
+                {/* Dashboard Stats (Overview) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">TỔNG TỒN KHO</p>
+                            <h3 className="text-3xl font-extrabold text-slate-800">{totalStock.toLocaleString()} <span className="text-sm font-medium text-slate-500">kg</span></h3>
+                            <p className="text-xs text-[#13ecc8] font-bold mt-2 flex items-center gap-1">
+                                <span className="material-icons-outlined text-xs">inventory_2</span> Cập nhật thời gian thực
+                            </p>
                         </div>
-                        {/* Stat Card 2 */}
-                        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-primary/5 flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">CẢNH BÁO TỒN THẤP</p>
-                                <h3 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">5 <span className="text-sm font-medium text-slate-500">Mặt hàng</span></h3>
-                                <p className="text-xs text-error font-medium mt-2 flex items-center gap-1">
-                                    <span className="material-icons-outlined text-xs">warning</span> Cần nhập hàng ngay
-                                </p>
-                            </div>
-                            <div className="bg-error-container p-4 rounded-xl">
-                                <span className="material-icons-outlined text-error text-3xl">priority_high</span>
-                            </div>
-                        </div>
-                        {/* Stat Card 3 */}
-                        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm border border-primary/5 flex items-center justify-between relative overflow-hidden">
-                            <div className="relative z-10">
-                                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">CHỈ SỐ SỨC KHỎE AI</p>
-                                <h3 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">92%</h3>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                                    <p className="text-xs text-on-surface-variant">Hệ thống vận hành tối ưu</p>
-                                </div>
-                            </div>
-                            <div className="bg-primary/10 p-4 rounded-xl relative z-10">
-                                <span className="material-icons-outlined text-primary text-3xl">auto_awesome</span>
-                            </div>
-                            {/* Decorative AI Pattern */}
-                            <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4">
-                                <span className="material-icons-outlined text-[120px] text-primary">psychology</span>
-                            </div>
+                        <div className="bg-[#13ecc8]/10 p-4 rounded-xl">
+                            <span className="material-icons-outlined text-[#13ecc8] text-3xl">inventory</span>
                         </div>
                     </div>
-                    {/* Inventory Management Section */}
-                    <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-primary/5 overflow-hidden">
-                        {/* Table Header & Filters */}
-                        <div className="p-6 border-b border-primary/5 flex flex-col md:flex-row justify-between items-center gap-4">
-                            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Kho Hàng Hiện Tại</h2>
-                            <div className="flex items-center gap-3">
-                                <div className="flex bg-surface-container p-1 rounded-lg">
-                                    <button className="px-4 py-1.5 text-xs font-bold bg-white dark:bg-slate-800 text-primary rounded-md shadow-sm">Tất cả</button>
-                                    <button className="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-primary transition-colors">Tôm</button>
-                                    <button className="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-primary transition-colors">Cá</button>
-                                    <button className="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-primary transition-colors">Đông lạnh</button>
-                                    <button className="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-primary transition-colors">Tươi sống</button>
-                                </div>
-                                <button className="flex items-center gap-2 px-4 py-2 border border-primary/20 text-xs font-bold rounded-lg hover:bg-primary/5 transition-colors">
-                                    <span className="material-icons-outlined text-sm">filter_list</span>
-                                    Lọc
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">CẢNH BÁO TỒN THẤP</p>
+                            <h3 className="text-3xl font-extrabold text-slate-800">{lowStockCount} <span className="text-sm font-medium text-slate-500">Mặt hàng</span></h3>
+                            <p className={`text-xs font-bold mt-2 flex items-center gap-1 ${lowStockCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                <span className="material-icons-outlined text-xs">warning</span> {lowStockCount > 0 ? 'Cần kiểm tra ngay' : 'Tồn kho ổn định'}
+                            </p>
+                        </div>
+                        <div className={`p-4 rounded-xl ${lowStockCount > 0 ? 'bg-red-50' : 'bg-slate-50'}`}>
+                            <span className={`material-icons-outlined text-3xl ${lowStockCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>priority_high</span>
+                        </div>
+                    </div>
+
+                    <div className="bg-[#13ecc8]/10 p-6 rounded-xl shadow-sm border border-[#13ecc8]/20 flex items-center justify-between relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-[10px] uppercase tracking-widest text-cyan-800 font-bold mb-1">CHỈ SỐ SỨC KHỎE AI</p>
+                            <h3 className="text-3xl font-extrabold text-cyan-900">92%</h3>
+                            <div className="flex items-center gap-2 mt-2">
+                                <div className="w-2 h-2 rounded-full bg-[#13ecc8] animate-pulse"></div>
+                                <p className="text-xs text-cyan-800/70 font-bold uppercase tracking-tighter">Hệ thống vận hành tối ưu</p>
+                            </div>
+                        </div>
+                        <div className="bg-[#13ecc8]/20 p-4 rounded-xl relative z-10">
+                            <span className="material-icons-outlined text-cyan-800 text-3xl">auto_awesome</span>
+                        </div>
+                        <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4 group-hover:scale-110 transition-transform duration-500">
+                            <span className="material-icons-outlined text-[120px] text-cyan-800">psychology</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Inventory Management Section */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                    {/* Table Header & Filters */}
+                    <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/30">
+                        <h2 className="text-lg font-bold text-slate-800">Kho Hàng Hệ Thống</h2>
+                        <div className="flex items-center gap-3">
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button 
+                                    onClick={() => setFilterCategory('ALL')}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Tất cả
+                                </button>
+                                <button 
+                                    onClick={() => setFilterCategory('SHRIMP')}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'SHRIMP' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Tôm
+                                </button>
+                                <button 
+                                    onClick={() => setFilterCategory('FISH')}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'FISH' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Cá
                                 </button>
                             </div>
                         </div>
-                        {/* Data Table */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-surface-container/50">
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Sản phẩm</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Mã Lô</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Danh mục</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-right whitespace-nowrap">Số lượng (kg)</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Chỉ số AI</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-center whitespace-nowrap">Ngày lưu kho</th>
-                                        <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-right whitespace-nowrap">Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-primary/5">
-                                    {/* Row 1 */}
-                                    <tr className="hover:bg-primary/5 transition-colors group">
+                    </div>
+
+                    {/* Data Table */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50">
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Sản phẩm</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">ID Tin Đăng</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap">Người Bán</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-right whitespace-nowrap">Số lượng (kg)</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold whitespace-nowrap text-center">Trạng Thái</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-center whitespace-nowrap">Ngày Đăng</th>
+                                    <th className="p-4 text-[10px] uppercase tracking-widest text-slate-500 font-bold text-right whitespace-nowrap">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {paginatedListings.map(listing => (
+                                    <tr key={listing.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/10">
-                                                    <img alt="Thẻ Chân Trắng" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmu7neN4A3Vd6ErlApYzSkgyP6bpNk4TGo1IJNPimhHa9wmPcxbFs_YdpRXcdEkf-PuVcXruU2lPhVh5rMK0kyO349UAtS4xOPURmT-VUMN-oQ07XybVvBv54YuwWpMvFaXMUlCdSnXuNS7vay0hdfjrTVeYQFHreYl1-lZPQ6VT7B0cjyADg7OWp_e_uNQ5caRLmQrFWioU1a7SY-D4ttsZg9ufQv5n80vAx10TJ6nMLXmPfWV89LbyzIC8HiSDDqbDgY2PMmnlLc"/>
+                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                                                    {listing.thumbnailUrl ? (
+                                                        <img alt={listing.title} className="w-full h-full object-cover" src={listing.thumbnailUrl}/>
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
+                                                            <span className="material-icons-outlined">image</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Tôm Thẻ Chân Trắng</p>
-                                                    <p className="text-[10px] text-slate-400">Xuất xứ: Cà Mau</p>
+                                                    <p className="text-sm font-bold text-slate-800">{listing.title}</p>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{listing.category} • {listing.species}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-4 font-mono text-xs text-slate-600 dark:text-slate-400">AQ-2024-081</td>
-                                        <td className="p-4">
-                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 uppercase tracking-tight whitespace-nowrap">Tươi sống</span>
+                                        <td className="p-4 font-mono text-[10px] text-slate-500 font-bold">
+                                            {listing.id.substring(0, 8).toUpperCase()}
                                         </td>
-                                        <td className="p-4 text-sm font-bold text-right text-slate-800 dark:text-slate-200">850.5</td>
                                         <td className="p-4">
-                                            <div className="flex flex-col gap-1.5 w-32">
-                                                <div className="flex justify-between items-center text-[10px]">
-                                                    <span className="font-bold text-primary">98%</span>
-                                                    <span className="text-slate-400 uppercase">Tối ưu</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                                    <div className="h-full bg-primary" style={{width: '98%'}}></div>
-                                                </div>
-                                            </div>
+                                            <p className="text-xs font-bold text-slate-700">{listing.sellerName || 'Anonymous'}</p>
+                                        </td>
+                                        <td className="p-4 text-sm font-bold text-right text-slate-800">
+                                            {listing.availableQuantity?.toLocaleString()}
                                         </td>
                                         <td className="p-4 text-center">
-                                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">4 Ngày</span>
+                                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-widest whitespace-nowrap ${
+                                                listing.status === 'AVAILABLE' ? 'bg-[#13ecc8]/10 text-cyan-800' :
+                                                listing.status === 'PENDING_REVIEW' ? 'bg-orange-50 text-orange-600' :
+                                                'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {listing.status}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                                {new Date(listing.createdAt).toLocaleDateString('vi-VN')}
+                                            </span>
                                         </td>
                                         <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">edit</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">monitoring</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">more_vert</span></button>
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-[#13ecc8] transition-all" title="Xem chi tiết"><span className="material-icons-outlined text-sm">visibility</span></button>
+                                                <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-all" title="Gỡ tin"><span className="material-icons-outlined text-sm">delete_outline</span></button>
                                             </div>
                                         </td>
                                     </tr>
-                                    {/* Row 2 */}
-                                    <tr className="hover:bg-primary/5 transition-colors group">
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/10">
-                                                    <img alt="Hồi Nauy" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD57sRoLA2zZlAKFtRNkCXU2VgeVh107m1Vry4LxKHT0sJFzqAnhCzE268gkxMaLP0dNsIYDRAl7C2ugpmKPUNOEl7iGJURLrmukk9vyxpCaa4v2aC6TisT7n41F8RhJ0p3602XL5iv1_kR0dG7tmqvOzrsh_1imAG3Gn9T4_M9_QsNkAti12WfkirxLnuAWfSqYaZiZkr4z7BEJ6IcE2cS-NXPx6S64MsvwiI-2bO2Fq1q8eNr3d6AggZFL_cRg-QqwRhhTDJXBkfc"/>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Cá Hồi Nauy</p>
-                                                    <p className="text-[10px] text-slate-400">Xuất xứ: Nhập khẩu</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-mono text-xs text-slate-600 dark:text-slate-400">AQ-2024-079</td>
-                                        <td className="p-4">
-                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 uppercase tracking-tight whitespace-nowrap">Đông lạnh</span>
-                                        </td>
-                                        <td className="p-4 text-sm font-bold text-right text-slate-800 dark:text-slate-200">120.0</td>
-                                        <td className="p-4">
-                                            <div className="flex flex-col gap-1.5 w-32">
-                                                <div className="flex justify-between items-center text-[10px]">
-                                                    <span className="font-bold text-primary">85%</span>
-                                                    <span className="text-slate-400 uppercase">Khá</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                                    <div className="h-full bg-primary" style={{width: '85%'}}></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">12 Ngày</span>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">edit</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">monitoring</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">more_vert</span></button>
-                                            </div>
-                                        </td>
+                                ))}
+                                {paginatedListings.length === 0 && (
+                                    <tr>
+                                        <td colSpan="7" className="p-12 text-center text-slate-400 font-bold italic">Không có dữ liệu kho hàng nào</td>
                                     </tr>
-                                    {/* Row 3 (Alert State) */}
-                                    <tr className="hover:bg-primary/5 transition-colors group">
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/10">
-                                                    <img alt="Bạch Tuộc" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB1xIFNhtg82bDMYGFuouOwH-iemiyeUyl_ErzfQl3rpOfeE8cfWd_3LF_wr4dCYiQ38lDogAvX6gHhYaRQQKRejok89YBEKkqtYfWoNK_7UHmaXRZUFYDCw0f5CK7jCd_tGUq8a7uf72MU9p9wBF7nSQ7sCEu_OZT2E_dikTvCc0lHiFDRfB1FS7wgKgNYmGhwWYHKlpODc8RnA-8Cg4uQzjA4rc6B9PwOl5-gTINnxNsA55dZUoNxz1PNH1CQZX56S-juLEHwNq2X"/>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Bạch Tuộc Nhúng Giấm</p>
-                                                    <p className="text-[10px] text-slate-400">Xuất xứ: Kiên Giang</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-mono text-xs text-slate-600 dark:text-slate-400">AQ-2024-095</td>
-                                        <td className="p-4">
-                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 uppercase tracking-tight whitespace-nowrap">Tươi sống</span>
-                                        </td>
-                                        <td className="p-4 text-sm font-bold text-right text-error border-b-0">12.5</td>
-                                        <td className="p-4">
-                                            <div className="flex flex-col gap-1.5 w-32">
-                                                <div className="flex justify-between items-center text-[10px]">
-                                                    <span className="font-bold text-error">42%</span>
-                                                    <span className="text-error uppercase">Cảnh báo</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                                    <div className="h-full bg-error" style={{width: '42%'}}></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">1 Ngày</span>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button className="px-3 py-1.5 bg-primary text-on-primary text-[10px] font-bold rounded-lg shadow-sm hover:opacity-90 transition-all uppercase tracking-tight whitespace-nowrap">Đặt ngay</button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">more_vert</span></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {/* Row 4 */}
-                                    <tr className="hover:bg-primary/5 transition-colors group">
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden border border-primary/10">
-                                                    <img alt="Tôm Hùm" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHKd2UhBqM__Tu5ilX4by3tA0PORXIpMrqYwuMZgZEbTeb-cK5mQc4wQ1bxIdZm5AgO-XcZs80IaU-bMBciQqXT4_4Bo0zvaGOfbXT_u3n3UkUNDJGIOc2qp-wtR8I784Llp7n2zIOt1t2NrPjjweefBY3Mg0zNzJa4akoYNR6F4WHU6BI7zp_xc5AR2RyX6rPuJa_nL9FjWVNmtQEP7Hxg6hL_DE72Ni6TpRbKgfYY1wD1ZLquXL1UM8sG0cLj0cRexoIXLDSLA7B"/>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Tôm Hùm Bông</p>
-                                                    <p className="text-[10px] text-slate-400">Xuất xứ: Khánh Hòa</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-mono text-xs text-slate-600 dark:text-slate-400">AQ-2024-102</td>
-                                        <td className="p-4">
-                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 uppercase tracking-tight whitespace-nowrap">Tươi sống</span>
-                                        </td>
-                                        <td className="p-4 text-sm font-bold text-right text-slate-800 dark:text-slate-200">45.0</td>
-                                        <td className="p-4">
-                                            <div className="flex flex-col gap-1.5 w-32">
-                                                <div className="flex justify-between items-center text-[10px]">
-                                                    <span className="font-bold text-primary">95%</span>
-                                                    <span className="text-slate-400 uppercase">Tối ưu</span>
-                                                </div>
-                                                <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                                                    <div className="h-full bg-primary" style={{width: '95%'}}></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">2 Ngày</span>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">edit</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">monitoring</span></button>
-                                                <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-all"><span className="material-icons-outlined text-sm">more_vert</span></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        {/* Table Footer / Pagination */}
-                        <div className="p-4 border-t border-primary/5 flex items-center justify-between">
-                            <p className="text-[10px] text-slate-500 font-medium">Đang hiển thị 4 trên 45 mặt hàng</p>
-                            <div className="flex gap-1">
-                                <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-primary/10 text-slate-400 hover:border-primary hover:text-primary transition-colors"><span className="material-icons-outlined text-sm">chevron_left</span></button>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-on-primary text-xs font-bold">1</button>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-primary/10 text-slate-500 text-xs font-bold hover:bg-primary/5">2</button>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-primary/10 text-slate-500 text-xs font-bold hover:bg-primary/5">3</button>
-                                <button className="w-8 h-8 flex items-center justify-center rounded-lg border border-primary/10 text-slate-400 hover:border-primary hover:text-primary transition-colors"><span class="material-icons-outlined text-sm">chevron_right</span></button>
-                            </div>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Table Footer / Pagination */}
+                    <div className="p-4 border-t border-slate-50 flex items-center justify-between bg-slate-50/30">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                            Hiển thị {paginatedListings.length} trên {filteredListings.length} mặt hàng
+                        </p>
+                        <div className="flex gap-1">
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.max(1, p-1))}
+                                disabled={currentPage === 1}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-[#13ecc8] hover:text-[#13ecc8] transition-colors disabled:opacity-30"
+                            >
+                                <span className="material-icons-outlined text-sm">chevron_left</span>
+                            </button>
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button 
+                                    key={i+1}
+                                    onClick={() => setCurrentPage(i+1)}
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${currentPage === i+1 ? 'bg-slate-800 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    {i+1}
+                                </button>
+                            ))}
+                            <button 
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))}
+                                disabled={currentPage === totalPages}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-[#13ecc8] hover:text-[#13ecc8] transition-colors disabled:opacity-30"
+                            >
+                                <span className="material-icons-outlined text-sm">chevron_right</span>
+                            </button>
                         </div>
                     </div>
-                    {/* Footer (Shared Component) */}
-                  <Footer/>
+                </div>
+                <Footer/>
             </div>
         </AdminLayout>
     );

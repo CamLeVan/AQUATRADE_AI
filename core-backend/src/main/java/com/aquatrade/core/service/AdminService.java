@@ -9,6 +9,7 @@ public interface AdminService {
     // [NEW] Quản lý Users
     java.util.List<AdminDto.UserSummary> getAllUsers();
     void toggleUserStatus(String userId, AdminDto.ToggleUserStatusRequest request);
+    AdminDto.UserSummary createUser(com.aquatrade.core.dto.AuthDto.RegisterRequest request);
 
     // [NEW] Giám sát Orders
     java.util.List<AdminDto.OrderSummary> getAllOrders();
@@ -18,4 +19,7 @@ public interface AdminService {
 
     // [NEW] Xem Treasury
     AdminDto.TreasurySummary getTreasury();
+
+    AdminDto.SystemStatsSummary getSystemStats();
+    java.util.List<com.aquatrade.core.dto.ListingDto> getAllListings();
 }

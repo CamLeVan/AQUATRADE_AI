@@ -17,12 +17,24 @@ public class AdminController {
 
     private final AdminService adminService;
 
+    @GetMapping("/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AdminDto.SystemStatsSummary>> getSystemStats() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getSystemStats()));
+    }
+
     // ---------- Users ----------
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<AdminDto.UserSummary>>> getAllUsers() {
         List<AdminDto.UserSummary> users = adminService.getAllUsers();
         return ResponseEntity.ok(ApiResponse.success(users));
+    }
+
+    @PostMapping("/users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<AdminDto.UserSummary>> createUser(@RequestBody com.aquatrade.core.dto.AuthDto.RegisterRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.createUser(request), "Người dùng đã được tạo thành công"));
     }
 
     @PutMapping("/users/{userId}/status")
@@ -70,5 +82,11 @@ public class AdminController {
                                                                @RequestBody AdminDto.ModerateListingRequest request) {
         adminService.moderateListing(id, request);
         return ResponseEntity.ok(ApiResponse.success("Đã cập nhật trạng thái tin đăng thành công"));
+    }
+
+    @GetMapping("/listings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<com.aquatrade.core.dto.ListingDto>>> getAllListings() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAllListings()));
     }
 }

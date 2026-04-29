@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/test/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/listings/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/posts/**").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
 
                 // === INTERNAL (API Key Auth, không dùng JWT) ===
                 .requestMatchers("/api/v1/internal/**").permitAll()

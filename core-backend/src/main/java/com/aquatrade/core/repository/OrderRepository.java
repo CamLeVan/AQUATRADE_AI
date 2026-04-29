@@ -13,4 +13,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     java.math.BigDecimal sumTotalPriceByStatus(@org.springframework.data.repository.query.Param("status") com.aquatrade.core.domain.enums.OrderStatus status);
 
     List<Order> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
+
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    long countByListingSellerId(UUID sellerId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(o.totalPrice), 0) FROM Order o WHERE o.listing.seller.id = :sellerId AND o.status = com.aquatrade.core.domain.enums.OrderStatus.COMPLETED")
+    java.math.BigDecimal sumRevenueBySellerId(@org.springframework.data.repository.query.Param("sellerId") UUID sellerId);
 }

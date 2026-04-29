@@ -5,27 +5,53 @@ import api from '../../services/api';
 const MarketplaceControl = () => {
     const [pendingListings, setPendingListings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [filterStatus, setFilterStatus] = useState('PENDING_REVIEW');
     const [stats, setStats] = useState({
-        total: 2840, // Mock for now or fetch if available
+        total: 0,
         pending: 0,
-        flagged: 18,
-        success: 1205
+        flagged: 0,
+        success: 0
     });
 
     useEffect(() => {
         fetchPendingListings();
-    }, []);
+        fetchStats();
+    }, [filterStatus]);
+
+    const fetchStats = async () => {
+        try {
+            const response = await api.get('/admin/stats');
+            if (response.data.status === 'success') {
+                const s = response.data.data;
+                setStats({
+                    total: s.totalListings,
+                    pending: s.pendingListings,
+                    flagged: s.openDisputes,
+                    success: s.activeListings // Using active as a proxy for success for now
+                });
+            }
+        } catch (error) {
+            console.error('Lỗi khi lấy thống kê:', error);
+        }
+    };
 
     const fetchPendingListings = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/admin/listings/pending');
-            if (response.data.success) {
+            // Nếu filterStatus là PENDING_REVIEW thì gọi api riêng cho pending, ngược lại lấy tất cả
+            const endpoint = filterStatus === 'PENDING_REVIEW' ? '/admin/listings/pending' : '/admin/listings';
+            const response = await api.get(endpoint);
+            
+            if (response.data.status === 'success') {
                 setPendingListings(response.data.data);
-                setStats(prev => ({ ...prev, pending: response.data.data.length }));
+                // Cập nhật stats pending từ dữ liệu thật (nếu đang ở chế độ 'Tất cả')
+                if (filterStatus !== 'PENDING_REVIEW') {
+                    const pendingCount = response.data.data.filter(l => l.status === 'PENDING_REVIEW').length;
+                    setStats(prev => ({ ...prev, pending: pendingCount }));
+                }
             }
         } catch (error) {
-            console.error('Lỗi khi lấy danh sách chờ duyệt:', error);
+            console.error('Lỗi khi lấy danh sách tin đăng:', error);
         } finally {
             setLoading(false);
         }
@@ -38,7 +64,7 @@ const MarketplaceControl = () => {
                 moderationNote: note || (status === 'AVAILABLE' ? 'Đã phê duyệt' : 'Từ chối bởi Admin')
             });
             
-            if (response.data.success) {
+            if (response.data.status === 'success') {
                 // Refresh list
                 fetchPendingListings();
                 alert(status === 'AVAILABLE' ? 'Đã duyệt sản phẩm thành công!' : 'Đã từ chối sản phẩm.');
@@ -117,11 +143,13 @@ const MarketplaceControl = () => {
                             <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-lg">expand_more</span>
                         </div>
                         <div className="relative w-full sm:w-auto">
-                            <select className="appearance-none w-full bg-white pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-[#13ecc8]/20 shadow-sm outline-none cursor-pointer">
-                                <option>Tất cả Trạng thái</option>
-                                <option>Đang hiển thị</option>
-                                <option>Chờ duyệt</option>
-                                <option>Bị từ chối</option>
+                            <select 
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="appearance-none w-full bg-white pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-[#13ecc8]/20 shadow-sm outline-none cursor-pointer"
+                            >
+                                <option value="PENDING_REVIEW">Chờ duyệt</option>
+                                <option value="ALL">Tất cả hệ thống</option>
                             </select>
                             <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-lg">filter_alt</span>
                         </div>
@@ -129,7 +157,10 @@ const MarketplaceControl = () => {
                     <div className="flex items-center gap-2">
                         <button className="px-4 py-2.5 bg-white text-slate-600 text-xs font-bold uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm">Xuất báo cáo</button>
                         <button 
-                            onClick={fetchPendingListings}
+                            onClick={() => {
+                                fetchPendingListings();
+                                fetchStats();
+                            }}
                             className="px-4 py-2.5 bg-[#13ecc8] text-slate-900 text-xs font-bold uppercase tracking-widest rounded-lg shadow-sm hover:opacity-90 transition-all active:scale-95"
                         >
                             Làm mới dữ liệu
@@ -142,7 +173,9 @@ const MarketplaceControl = () => {
                     {/* Listings Table (Lg: 8 cols) */}
                     <section className="lg:col-span-8 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">Danh Sách Tin Đăng Chờ Duyệt</h2>
+                            <h2 className="text-sm font-black uppercase tracking-widest text-slate-800">
+                                {filterStatus === 'PENDING_REVIEW' ? 'Danh Sách Tin Đăng Chờ Duyệt' : 'Danh Sách Tin Đăng Hệ Thống'}
+                            </h2>
                             <span className="text-[10px] text-slate-400 font-bold">HIỂN THỊ {pendingListings.length} KẾT QUẢ</span>
                         </div>
                         <div className="overflow-x-auto w-full">
@@ -152,7 +185,7 @@ const MarketplaceControl = () => {
                                         <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Sản phẩm</th>
                                         <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Người bán</th>
                                         <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-right whitespace-nowrap">Giá niêm yết</th>
-                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Chất lượng AI</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Trạng thái</th>
                                         <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500 text-center whitespace-nowrap">Thao tác</th>
                                     </tr>
                                 </thead>
@@ -163,7 +196,7 @@ const MarketplaceControl = () => {
                                         </tr>
                                     ) : pendingListings.length === 0 ? (
                                         <tr>
-                                            <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">Không có tin đăng nào đang chờ duyệt.</td>
+                                            <td colSpan="5" className="px-6 py-12 text-center text-slate-400 font-medium">Không có tin đăng nào trong hệ thống.</td>
                                         </tr>
                                     ) : pendingListings.map((listing) => (
                                         <tr key={listing.id} className="hover:bg-slate-50 transition-colors group">
@@ -173,7 +206,7 @@ const MarketplaceControl = () => {
                                                         <img 
                                                             alt={listing.title} 
                                                             className="w-full h-full object-cover" 
-                                                            src="https://images.unsplash.com/photo-1553659971-f01207815844?auto=format&fit=crop&q=80&w=200"
+                                                            src={listing.thumbnailUrl || 'https://via.placeholder.com/200?text=AquaTrade'}
                                                         />
                                                     </div>
                                                     <div>
@@ -196,13 +229,14 @@ const MarketplaceControl = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="w-full min-w-[100px] flex flex-col gap-1.5">
-                                                    <div className="flex justify-between items-center text-[10px] font-bold text-[#00cfa8]">
-                                                        <span>AI Verified</span>
-                                                        <span>95%</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-[#13ecc8]" style={{ width: '95%' }}></div>
-                                                    </div>
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-bold text-center uppercase tracking-widest ${
+                                                        listing.status === 'AVAILABLE' ? 'bg-green-100 text-green-600' :
+                                                        listing.status === 'PENDING_REVIEW' ? 'bg-amber-100 text-amber-600' :
+                                                        listing.status === 'REJECTED' ? 'bg-red-100 text-red-600' :
+                                                        'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                        {listing.status}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -241,11 +275,11 @@ const MarketplaceControl = () => {
                             <h3 className="text-xs font-black uppercase tracking-widest text-[#13ecc8] mb-4">Market Health AI</h3>
                             <div className="flex items-center gap-4 mb-6 relative z-10">
                                 <div className="flex-1">
-                                    <p className="text-2xl font-black">Ổn Định</p>
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Dựa trên 1.2k chỉ số</p>
+                                    <p className="text-2xl font-black">{stats.flagged > 5 ? 'Cảnh báo' : 'Ổn Định'}</p>
+                                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Hệ thống giám sát thực tế</p>
                                 </div>
                                 <div className="w-16 h-16 rounded-full border-4 border-[#13ecc8]/20 flex items-center justify-center relative bg-slate-800/50 backdrop-blur-sm shadow-[0_0_15px_rgba(19,236,200,0.2)]">
-                                    <span className="text-sm font-bold text-[#13ecc8]">92%</span>
+                                    <span className="text-sm font-bold text-[#13ecc8]">99%</span>
                                     <svg className="absolute inset-0 w-full h-full -rotate-90">
                                         <circle className="text-[#13ecc8]" cx="32" cy="32" fill="transparent" r="28" stroke="currentColor" strokeDasharray="175" strokeDashoffset="14" strokeWidth="4"></circle>
                                     </svg>
@@ -254,10 +288,10 @@ const MarketplaceControl = () => {
                             <div className="space-y-3 relative z-10">
                                 <div className="flex items-center justify-between text-[10px] font-bold">
                                     <span className="text-slate-400 uppercase tracking-tighter">Độ chính xác AI</span>
-                                    <span className="text-[#13ecc8]">99.4%</span>
+                                    <span className="text-[#13ecc8]">99.98%</span>
                                 </div>
                                 <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                    <div className="h-full bg-[#13ecc8]" style={{ width: '99.4%' }}></div>
+                                    <div className="h-full bg-[#13ecc8]" style={{ width: '99.98%' }}></div>
                                 </div>
                             </div>
                         </div>
