@@ -22,6 +22,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from . import metrics as ai_metrics
 from .schemas import WebhookPayload
 from .settings import Settings, get_settings
 
@@ -92,6 +93,8 @@ async def send_webhook(
     try:
         async for attempt in retry:
             with attempt:
+                if attempt.retry_state.attempt_number > 1:
+                    ai_metrics.webhook_delivery.labels(outcome="retry").inc()
                 return await _attempt()
     except Exception as exc:
         logger.error(

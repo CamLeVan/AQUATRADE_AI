@@ -147,6 +147,14 @@ class WebhookPayload(BaseModel):
 # Health & Models
 # ---------------------------------------------------------------------------
 
+class DependencyStatus(BaseModel):
+    """Trạng thái 1 dependency (Redis, MinIO...). Sprint 4."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    status: Literal["UP", "DOWN", "DISABLED"]
+    error: str | None = None
+
+
 class HealthResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -157,6 +165,8 @@ class HealthResponse(BaseModel):
     model_version: str = Field(..., alias="modelVersion")
     uptime_seconds: float = Field(..., alias="uptimeSeconds")
     pending_jobs: int = Field(..., alias="pendingJobs")
+    # Sprint 4: dependency health detail
+    dependencies: dict[str, DependencyStatus] = Field(default_factory=dict)
 
 
 class ModelInfo(BaseModel):

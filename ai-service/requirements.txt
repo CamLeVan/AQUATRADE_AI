@@ -22,5 +22,9 @@ arq>=0.26
 redis>=5.0
 minio>=7.2
 
+# ===== Observability (Sprint 4) =====
+structlog>=24.1
+prometheus-client>=0.19
+
 # ===== Dev / test =====
 pytest>=8.0

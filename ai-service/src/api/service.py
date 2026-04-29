@@ -10,25 +10,30 @@ Flow hiện tại (Sprint 3.1):
     7. Xóa file gốc data/incoming/ để tiết kiệm disk
 
 Mọi lỗi trung gian đều được catch và mark job FAILED với error message.
+
+Sprint 4 thêm: structured logging với context ticket_id/order_id, và
+Prometheus metrics counters/histograms.
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
-import logging
 import os
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import httpx
 
+from . import metrics
+from .logging_config import bind_context, clear_context, get_logger
 from .schemas import WebhookPayload
 from .settings import Settings, get_settings
 from .storage import upload_annotated_video
 from .store import get_store
 from .webhook import WebhookDeliveryError, send_webhook
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def download_video(
@@ -91,11 +96,15 @@ async def process_job(ticket_id: str) -> None:
     store = get_store()
     job = await store.get(ticket_id)
     if job is None:
-        logger.error("process_job: ticket not found: %s", ticket_id)
+        logger.error("ticket_not_found", ticket_id=ticket_id)
         return
 
+    bind_context(ticket_id=ticket_id, order_id=job.order_id)
+    log = logger.bind(ticket_id=ticket_id, order_id=job.order_id)
+
     await store.mark_processing(ticket_id)
-    logger.info("Job start: ticket=%s order=%s url=%s", ticket_id, job.order_id, job.video_url)
+    log.info("job_start", video_url=job.video_url, fish_profile=job.fish_profile)
+    job_start_ts = time.perf_counter()
 
     incoming_path = os.path.join(
         settings.video_download_dir, _suggested_filename(job.video_url, ticket_id),
@@ -111,10 +120,7 @@ async def process_job(ticket_id: str) -> None:
         )
         await store.update_video_hash(ticket_id, video_hash)
         await store.update_progress(ticket_id, 0.15)
-        logger.info(
-            "Video downloaded: ticket=%s bytes=%d sha256=%s",
-            ticket_id, bytes_written, video_hash,
-        )
+        log.info("video_downloaded", bytes=bytes_written, sha256=video_hash)
 
         # ----- Bước 2: chạy pipeline (blocking trong thread) -----
         result = await asyncio.to_thread(
@@ -125,12 +131,19 @@ async def process_job(ticket_id: str) -> None:
             settings=settings,
         )
         await store.update_progress(ticket_id, 0.85)
+        log.info(
+            "pipeline_done",
+            fish_count=int(result.fish_count),
+            health_score=float(result.health_score),
+            processed_frames=int(getattr(result, "processed_frames", 0)),
+        )
 
         # ----- Bước 3: upload annotated lên MinIO nếu bật -----
         if settings.object_storage_enabled:
             result_video_url = await asyncio.to_thread(
                 upload_annotated_video, annotated_path, ticket_id, settings,
             )
+            log.info("storage_upload_ok", url=result_video_url)
         else:
             result_video_url = f"file://{os.path.abspath(annotated_path)}"
 
@@ -149,20 +162,30 @@ async def process_job(ticket_id: str) -> None:
             ack = await send_webhook(
                 payload, callback_url=job.callback_url, settings=settings,
             )
-            logger.info("Webhook ack: ticket=%s ack=%s", ticket_id, ack)
+            metrics.webhook_delivery.labels(outcome="success").inc()
+            log.info("webhook_ack", ack=ack)
         except WebhookDeliveryError as e:
             # Job đã xử lý xong nhưng BE không nhận được -> BE polling fallback.
-            logger.warning("Webhook failed, storing result for polling: %s", e)
+            metrics.webhook_delivery.labels(outcome="failed").inc()
+            log.warning("webhook_failed_storing_for_polling", error=str(e))
 
         # ----- Bước 5: chốt DONE -----
         await store.mark_done(ticket_id, result.to_dict())
-        logger.info(
-            "Job done: ticket=%s fishCount=%d health=%.1f",
-            ticket_id, result.fish_count, result.health_score,
+        elapsed = time.perf_counter() - job_start_ts
+        metrics.jobs_processed.labels(outcome="done").inc()
+        metrics.job_processing_seconds.observe(elapsed)
+        metrics.job_fish_count.observe(float(result.fish_count))
+        metrics.job_health_score.observe(float(result.health_score))
+        log.info(
+            "job_done",
+            fish_count=int(result.fish_count),
+            health_score=round(float(result.health_score), 1),
+            elapsed_seconds=round(elapsed, 2),
         )
 
     except Exception as exc:  # noqa: BLE001 - bắt mọi lỗi để mark fail
-        logger.exception("Job failed: ticket=%s", ticket_id)
+        metrics.jobs_processed.labels(outcome="failed").inc()
+        log.exception("job_failed", error=str(exc), error_type=type(exc).__name__)
         await store.mark_failed(ticket_id, f"{type(exc).__name__}: {exc}")
     finally:
         # Xóa video gốc để tiết kiệm disk (theo nghiệp vụ Bước 5).
@@ -171,6 +194,7 @@ async def process_job(ticket_id: str) -> None:
                 os.remove(incoming_path)
             except OSError:
                 pass
+        clear_context()
 
 
 def _run_pipeline(

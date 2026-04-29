@@ -6,13 +6,13 @@ Chạy dev:
 Chạy prod (ví dụ):
     uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 2
 
-Sprint 2 giới hạn: job chạy qua FastAPI BackgroundTasks (trong cùng
-process). Khi concurrent nhiều request → block nhau. Sprint 3 sẽ thay
-bằng Arq worker + Redis để scale ngang.
+Sprint 4 thêm:
+    * Structured logging (structlog JSON ở prod, console ở dev)
+    * Prometheus /metrics endpoint
+    * Health check chi tiết (Redis ping, MinIO ping, model loaded)
 """
 from __future__ import annotations
 
-import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -20,9 +20,11 @@ from typing import AsyncIterator
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
+from . import metrics
 from .deps import require_internal_secret
+from .logging_config import configure_logging, get_logger
 from .queue import enqueue_job
 from .schemas import (
     ApiResponse,
@@ -39,7 +41,8 @@ from .service import process_job
 from .settings import Settings, get_settings
 from .store import get_store
 
-logger = logging.getLogger(__name__)
+configure_logging()
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -56,21 +59,27 @@ _MODEL_STATE: dict[str, object] = {"loaded": False}
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     logger.info(
-        "Starting %s %s (env=%s)",
-        settings.app_name, settings.app_version, settings.environment,
+        "service_starting",
+        app=settings.app_name,
+        version=settings.app_version,
+        env=settings.environment,
+        queue_backend=settings.queue_backend,
+        store_backend=settings.job_store_backend,
+        storage_enabled=settings.object_storage_enabled,
     )
 
     # Warm-up model nếu có. Fail-soft: service vẫn chạy, health = DEGRADED.
     try:
         await _warmup_model(settings)
         _MODEL_STATE["loaded"] = True
-        logger.info("Model loaded: %s", settings.model_path)
+        logger.info("model_loaded", path=settings.model_path,
+                    version=settings.model_version)
     except Exception as e:  # noqa: BLE001
         _MODEL_STATE["loaded"] = False
-        logger.warning("Model not loaded at startup (will still accept jobs): %s", e)
+        logger.warning("model_not_loaded", error=str(e), path=settings.model_path)
 
     yield
-    logger.info("Shutting down %s", settings.app_name)
+    logger.info("service_shutting_down", app=settings.app_name)
 
 
 async def _warmup_model(settings: Settings) -> None:
@@ -86,6 +95,49 @@ async def _warmup_model(settings: Settings) -> None:
         _ = YOLO(settings.model_path)
 
     await asyncio.to_thread(_load)
+
+
+# ---------------------------------------------------------------------------
+# Health checks (Sprint 4)
+# ---------------------------------------------------------------------------
+
+async def _check_redis(settings: Settings) -> tuple[str, str | None]:
+    """Ping Redis. Trả ('UP'|'DOWN', error_msg)."""
+    if settings.job_store_backend != "redis" and settings.queue_backend != "arq":
+        return "DISABLED", None
+    try:
+        from redis.asyncio import Redis
+        r = Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            db=settings.redis_db,
+            password=settings.redis_password,
+            ssl=settings.redis_ssl,
+        )
+        await r.ping()
+        await r.close()
+        return "UP", None
+    except Exception as e:  # noqa: BLE001
+        return "DOWN", f"{type(e).__name__}: {e}"
+
+
+def _check_minio(settings: Settings) -> tuple[str, str | None]:
+    """Check MinIO connectivity (sync). Trả ('UP'|'DOWN'|'DISABLED')."""
+    if not settings.object_storage_enabled:
+        return "DISABLED", None
+    try:
+        from minio import Minio
+        client = Minio(
+            settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_secure,
+        )
+        # bucket_exists ép connect tới MinIO server
+        client.bucket_exists(settings.minio_bucket)
+        return "UP", None
+    except Exception as e:  # noqa: BLE001
+        return "DOWN", f"{type(e).__name__}: {e}"
 
 
 # ---------------------------------------------------------------------------
@@ -132,8 +184,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     _register_exception_handlers(app)
+    app.add_middleware(metrics.PrometheusMiddleware)
 
-    # ---- Health (public) ----
+    # ---- Metrics (public, prometheus scrape) ----
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint() -> Response:
+        body, content_type = metrics.render_metrics()
+        return Response(content=body, media_type=content_type)
+
+    # ---- Health (public, chi tiết) ----
     @app.get(
         "/ai/v1/health",
         response_model=ApiResponse[HealthResponse],
@@ -143,16 +202,52 @@ def create_app() -> FastAPI:
     async def health(
         settings: Settings = Depends(get_settings),
     ) -> ApiResponse[HealthResponse]:
+        from .schemas import DependencyStatus
+
         store = get_store()
         pending = await store.count_pending()
+
+        # Reflect pending count vào Prometheus gauge mỗi lần health check.
+        metrics.jobs_pending.set(pending)
+
+        # Check deps song song
+        redis_status, redis_err = await _check_redis(settings)
+        # MinIO sync, chạy thread
+        import asyncio
+        minio_status, minio_err = await asyncio.to_thread(_check_minio, settings)
+
+        deps = {
+            "model": DependencyStatus(
+                status="UP" if _MODEL_STATE["loaded"] else "DOWN",
+                error=None if _MODEL_STATE["loaded"] else "model not loaded",
+            ),
+            "redis": DependencyStatus(status=redis_status, error=redis_err),
+            "minio": DependencyStatus(status=minio_status, error=minio_err),
+        }
+
+        # Overall status:
+        #   DOWN     - infra critical (Redis/MinIO) UP-required nhưng đang DOWN
+        #   DEGRADED - infra OK nhưng model chưa load (không thể inference)
+        #   UP       - mọi thứ sẵn sàng
+        infra_down = any(
+            deps[name].status == "DOWN" for name in ("redis", "minio")
+        )
+        if infra_down:
+            overall = "DOWN"
+        elif not _MODEL_STATE["loaded"]:
+            overall = "DEGRADED"
+        else:
+            overall = "UP"
+
         data = HealthResponse(
-            status="UP" if _MODEL_STATE["loaded"] else "DEGRADED",
+            status=overall,
             app_name=settings.app_name,
             app_version=settings.app_version,
             model_loaded=bool(_MODEL_STATE["loaded"]),
             model_version=settings.model_version,
             uptime_seconds=time.monotonic() - START_TIME,
             pending_jobs=pending,
+            dependencies=deps,
         )
         return ApiResponse(data=data)
 
@@ -205,16 +300,20 @@ def create_app() -> FastAPI:
             if mode == "background":
                 # giữ tương thích cũ khi queue_backend=background
                 background.add_task(process_job, record.ticket_id)
+            metrics.jobs_submitted.labels(status="new").inc()
             logger.info(
-                "Job queued: ticket=%s order=%s mode=%s",
-                record.ticket_id,
-                record.order_id,
-                mode,
+                "job_queued",
+                ticket_id=record.ticket_id,
+                order_id=record.order_id,
+                mode=mode,
             )
         else:
+            metrics.jobs_submitted.labels(status="idempotent_hit").inc()
             logger.info(
-                "Job idempotent hit: orderId=%s already has ticket=%s status=%s",
-                record.order_id, record.ticket_id, record.status.value,
+                "job_idempotent_hit",
+                order_id=record.order_id,
+                ticket_id=record.ticket_id,
+                existing_status=record.status.value,
             )
 
         data = JobAcceptedResponse(
