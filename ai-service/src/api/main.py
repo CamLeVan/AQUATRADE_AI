@@ -23,6 +23,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .deps import require_internal_secret
+from .queue import enqueue_job
 from .schemas import (
     ApiResponse,
     ErrorResponse,
@@ -200,9 +201,15 @@ def create_app() -> FastAPI:
         )
 
         if is_new:
-            background.add_task(process_job, record.ticket_id)
+            mode = await enqueue_job(record.ticket_id, settings)
+            if mode == "background":
+                # giữ tương thích cũ khi queue_backend=background
+                background.add_task(process_job, record.ticket_id)
             logger.info(
-                "Job queued: ticket=%s order=%s", record.ticket_id, record.order_id,
+                "Job queued: ticket=%s order=%s mode=%s",
+                record.ticket_id,
+                record.order_id,
+                mode,
             )
         else:
             logger.info(

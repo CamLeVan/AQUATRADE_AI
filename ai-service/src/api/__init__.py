@@ -8,7 +8,10 @@ Kiến trúc:
     settings.py  - cấu hình từ env vars
     schemas.py   - Pydantic models (request/response/webhook)
     deps.py      - X-Internal-Secret auth
-    store.py     - JobStore in-memory (Sprint 3 sẽ chuyển sang Redis/Postgres)
-    service.py   - orchestration: download video → analyze → webhook
+    store.py     - JobStore in-memory (status API)
+    queue.py     - submit job qua background hoặc Arq (feature-flag)
+    worker.py    - Arq worker settings + task entrypoint
+    service.py   - orchestration: download video → analyze → upload → webhook
+    storage.py   - MinIO upload + signed URL
     webhook.py   - httpx async client + tenacity retry
 """

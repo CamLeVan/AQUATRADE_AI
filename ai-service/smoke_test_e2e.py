@@ -118,11 +118,13 @@ FAKE_RESULT = AnalysisResult(
 
 
 async def fake_download_video(url, dest_path, settings):
-    # Không tải gì cả, chỉ chạm đến hàm
+    # Không tải gì cả, chỉ chạm đến hàm. Trả (bytes_written, sha256_hex).
+    import hashlib
     os.makedirs(os.path.dirname(os.path.abspath(dest_path)) or ".", exist_ok=True)
+    payload = b"FAKE VIDEO CONTENT"
     with open(dest_path, "wb") as f:
-        f.write(b"FAKE VIDEO CONTENT")
-    return 18
+        f.write(payload)
+    return len(payload), hashlib.sha256(payload).hexdigest()
 
 
 def fake_run_pipeline(**kwargs):
@@ -214,18 +216,27 @@ async def run_e2e():
     print(f"    X-Internal-Secret header: {headers.get('X-Internal-Secret')}")
     print(f"    Payload: {json.dumps(webhook, indent=6, ensure_ascii=False)}")
 
-    # Verify webhook khớp §3 contract
-    expected_keys = {"ticketId", "orderId", "fishCount", "healthScore",
+    # Verify webhook khớp §3 contract (6 field bắt buộc + originalVideoHash optional)
+    required_keys = {"ticketId", "orderId", "fishCount", "healthScore",
                      "resultVideoUrl", "timestamp"}
-    assert set(webhook.keys()) == expected_keys, \
-        f"Payload keys sai: {set(webhook.keys())} vs {expected_keys}"
+    assert required_keys.issubset(set(webhook.keys())), \
+        f"Thiếu required keys: {required_keys - set(webhook.keys())}"
+    optional_allowed = required_keys | {"originalVideoHash"}
+    extra = set(webhook.keys()) - optional_allowed
+    assert not extra, f"Có field lạ trong payload: {extra}"
+
     assert webhook["orderId"] == "e2e-order-001"
     assert webhook["fishCount"] == 157
     assert webhook["healthScore"] == 82.5
     assert webhook["ticketId"] == ticket_id
     assert webhook["timestamp"].endswith("Z"), "Timestamp phải ISO-8601 UTC Z"
     assert headers["X-Internal-Secret"] == "e2e-shared-secret"
-    print("\n[OK] Webhook payload khớp CHÍNH XÁC §3 EXHAUSTIVE_API_CONTRACT.md")
+
+    # Sprint 3.1: originalVideoHash phải có và là SHA-256 hex (64 ký tự)
+    assert "originalVideoHash" in webhook, "Thiếu originalVideoHash (Sprint 3.1)"
+    assert len(webhook["originalVideoHash"]) == 64
+    assert all(c in "0123456789abcdef" for c in webhook["originalVideoHash"])
+    print("\n[OK] Webhook payload khớp §3 + originalVideoHash (Sprint 3.1)")
 
     # 5. Clean up
     server.should_exit = True

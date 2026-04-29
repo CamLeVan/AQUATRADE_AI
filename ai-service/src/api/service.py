@@ -1,18 +1,20 @@
 """Orchestration: 1 job từ lúc nhận đến khi gửi webhook.
 
-Flow (Sprint 2 - sync tạm thời, Sprint 3 sẽ wrap bằng Arq worker):
-    1. Download video từ videoUrl → file tạm
-    2. Gọi pipeline.analyze_video() (blocking) qua asyncio.to_thread
-       để không block event loop của FastAPI
-    3. (TODO Sprint 3) Upload annotated video lên S3/MinIO, lấy URL
-    4. Build WebhookPayload → gửi về BE qua webhook.send_webhook
-    5. Lưu kết quả vào JobStore
+Flow hiện tại (Sprint 3.1):
+    1. Download video từ videoUrl -> file tạm + tính SHA-256 (audit/dispute)
+    2. Lưu hash vào JobStore + log
+    3. Gọi pipeline.analyze_video() (blocking) qua asyncio.to_thread
+    4. (optional) Upload annotated video lên MinIO -> presigned URL
+    5. Build WebhookPayload (kèm originalVideoHash) -> gửi BE qua webhook
+    6. Lưu kết quả vào JobStore (DONE/FAILED)
+    7. Xóa file gốc data/incoming/ để tiết kiệm disk
 
 Mọi lỗi trung gian đều được catch và mark job FAILED với error message.
 """
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import os
 from datetime import datetime, timezone
@@ -20,19 +22,29 @@ from urllib.parse import urlparse
 
 import httpx
 
-from .schemas import JobStatus, WebhookPayload
+from .schemas import WebhookPayload
 from .settings import Settings, get_settings
-from .store import JobStore, get_store
+from .storage import upload_annotated_video
+from .store import get_store
 from .webhook import WebhookDeliveryError, send_webhook
 
 logger = logging.getLogger(__name__)
 
 
-async def download_video(url: str, dest_path: str, settings: Settings) -> int:
-    """Stream download video về `dest_path`, trả về số byte đã ghi."""
+async def download_video(
+    url: str,
+    dest_path: str,
+    settings: Settings,
+) -> tuple[int, str]:
+    """Stream download video về `dest_path`, đồng thời tính SHA-256.
+
+    Returns:
+        (bytes_written, hex_sha256). Hash dùng cho `originalVideoHash` webhook.
+    """
     os.makedirs(os.path.dirname(os.path.abspath(dest_path)) or ".", exist_ok=True)
     max_bytes = settings.max_video_size_mb * 1024 * 1024
     written = 0
+    hasher = hashlib.sha256()
 
     if url.startswith("file://"):
         src = url[len("file://"):]
@@ -46,8 +58,9 @@ async def download_video(url: str, dest_path: str, settings: Settings) -> int:
                 written += len(chunk)
                 if written > max_bytes:
                     raise ValueError(f"Video vượt {settings.max_video_size_mb}MB")
+                hasher.update(chunk)
                 fw.write(chunk)
-        return written
+        return written, hasher.hexdigest()
 
     async with httpx.AsyncClient(timeout=settings.video_download_timeout_seconds) as client:
         async with client.stream("GET", url) as resp:
@@ -57,8 +70,9 @@ async def download_video(url: str, dest_path: str, settings: Settings) -> int:
                     written += len(chunk)
                     if written > max_bytes:
                         raise ValueError(f"Video vượt {settings.max_video_size_mb}MB")
+                    hasher.update(chunk)
                     fw.write(chunk)
-    return written
+    return written, hasher.hexdigest()
 
 
 def _suggested_filename(url: str, ticket_id: str) -> str:
@@ -69,7 +83,7 @@ def _suggested_filename(url: str, ticket_id: str) -> str:
 
 
 async def process_job(ticket_id: str) -> None:
-    """Chạy 1 job end-to-end. KHÔNG raise ra ngoài (dùng trong BackgroundTasks).
+    """Chạy 1 job end-to-end. KHÔNG raise ra ngoài (dùng cho BackgroundTasks/Arq).
 
     Mọi exception đều được catch và lưu thành error trong store.
     """
@@ -91,10 +105,18 @@ async def process_job(ticket_id: str) -> None:
     )
 
     try:
-        await download_video(job.video_url, incoming_path, settings)
-        logger.info("Video downloaded: %s", incoming_path)
+        # ----- Bước 1: download + hash -----
+        bytes_written, video_hash = await download_video(
+            job.video_url, incoming_path, settings,
+        )
+        await store.update_video_hash(ticket_id, video_hash)
+        await store.update_progress(ticket_id, 0.15)
+        logger.info(
+            "Video downloaded: ticket=%s bytes=%d sha256=%s",
+            ticket_id, bytes_written, video_hash,
+        )
 
-        # Gọi analyze_video blocking trong thread khác để không chặn event loop
+        # ----- Bước 2: chạy pipeline (blocking trong thread) -----
         result = await asyncio.to_thread(
             _run_pipeline,
             video_path=incoming_path,
@@ -102,10 +124,17 @@ async def process_job(ticket_id: str) -> None:
             fish_profile=job.fish_profile or settings.default_fish_profile,
             settings=settings,
         )
+        await store.update_progress(ticket_id, 0.85)
 
-        # TODO Sprint 3: upload annotated_path lên S3/MinIO → lấy URL thật
-        result_video_url = f"file://{os.path.abspath(annotated_path)}"
+        # ----- Bước 3: upload annotated lên MinIO nếu bật -----
+        if settings.object_storage_enabled:
+            result_video_url = await asyncio.to_thread(
+                upload_annotated_video, annotated_path, ticket_id, settings,
+            )
+        else:
+            result_video_url = f"file://{os.path.abspath(annotated_path)}"
 
+        # ----- Bước 4: webhook về BE -----
         payload = WebhookPayload(
             ticket_id=ticket_id,
             order_id=job.order_id,
@@ -113,6 +142,7 @@ async def process_job(ticket_id: str) -> None:
             health_score=float(result.health_score),
             result_video_url=result_video_url,
             timestamp=datetime.now(timezone.utc),
+            original_video_hash=video_hash,
         )
 
         try:
@@ -121,16 +151,21 @@ async def process_job(ticket_id: str) -> None:
             )
             logger.info("Webhook ack: ticket=%s ack=%s", ticket_id, ack)
         except WebhookDeliveryError as e:
-            # Job đã xử lý xong nhưng BE không nhận được. Lưu lại để BE polling.
+            # Job đã xử lý xong nhưng BE không nhận được -> BE polling fallback.
             logger.warning("Webhook failed, storing result for polling: %s", e)
 
+        # ----- Bước 5: chốt DONE -----
         await store.mark_done(ticket_id, result.to_dict())
-        logger.info("Job done: ticket=%s fishCount=%d", ticket_id, result.fish_count)
+        logger.info(
+            "Job done: ticket=%s fishCount=%d health=%.1f",
+            ticket_id, result.fish_count, result.health_score,
+        )
 
-    except Exception as exc:  # noqa: BLE001 - muốn bắt mọi lỗi để mark fail
+    except Exception as exc:  # noqa: BLE001 - bắt mọi lỗi để mark fail
         logger.exception("Job failed: ticket=%s", ticket_id)
         await store.mark_failed(ticket_id, f"{type(exc).__name__}: {exc}")
     finally:
+        # Xóa video gốc để tiết kiệm disk (theo nghiệp vụ Bước 5).
         if os.path.isfile(incoming_path):
             try:
                 os.remove(incoming_path)
@@ -165,5 +200,4 @@ def _run_pipeline(
 __all__ = [
     "download_video",
     "process_job",
-    "JobStore",
 ]

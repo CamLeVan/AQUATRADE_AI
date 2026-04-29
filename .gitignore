@@ -40,6 +40,15 @@ ENV/
 # Bỏ qua log
 *.log
 
+# === AI service runtime artifacts ===
+ai-service/data/outputs/*.json
+ai-service/data/outputs/*.mp4
+ai-service/data/incoming/
+ai-service/Ultralytics/
+ai-service/.history/
+ai-service/counting_history.json
+ai-service/fish_report.csv
+
 # =========================
 # 2. JAVA (Backend Spring Boot)
 # =========================

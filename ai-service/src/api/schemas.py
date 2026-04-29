@@ -112,9 +112,10 @@ class JobStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class WebhookPayload(BaseModel):
-    """KHỚP CHÍNH XÁC §3 EXHAUSTIVE_API_CONTRACT.md.
+    """KHỚP §3 EXHAUSTIVE_API_CONTRACT.md.
 
-    Field names (camelCase), types, và timestamp format phải đúng nguyên.
+    6 field bắt buộc theo §3 GIỮ NGUYÊN. Bổ sung optional `originalVideoHash`
+    cho mục đích audit/dispute (Sprint 3.1) — BE chưa parse cũng không sao.
     Nếu BE update contract, phải update schema này đồng thời.
     """
     model_config = ConfigDict(populate_by_name=True)
@@ -125,10 +126,15 @@ class WebhookPayload(BaseModel):
     health_score: float = Field(..., alias="healthScore", ge=0.0, le=100.0)
     result_video_url: str = Field(..., alias="resultVideoUrl")
     timestamp: datetime
+    original_video_hash: str | None = Field(
+        default=None,
+        alias="originalVideoHash",
+        description="SHA-256 hex digest của video gốc đã download (audit/dispute).",
+    )
 
     def to_wire(self) -> dict[str, Any]:
         """JSON-ready dict với alias camelCase + timestamp ISO-8601 UTC Z."""
-        data = self.model_dump(by_alias=True, mode="json")
+        data = self.model_dump(by_alias=True, mode="json", exclude_none=True)
         ts = self.timestamp
         if ts.tzinfo is None:
             data["timestamp"] = ts.isoformat() + "Z"

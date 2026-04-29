@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # === App metadata ===
     app_name: str = "AquaTrade AI Service"
-    app_version: str = "2.0.0-sprint2"
+    app_version: str = "3.0.0-sprint3"
     environment: Literal["dev", "staging", "prod"] = "dev"
 
     # === Security ===
@@ -74,11 +74,50 @@ class Settings(BaseSettings):
     # === Annotated video output ===
     annotated_output_dir: str = "data/outputs"
 
+    # === Queue backend (Sprint 3) ===
+    # `background`: giữ cách cũ (FastAPI BackgroundTasks) để tương thích ngược.
+    # `arq`: enqueue job qua Redis + Arq worker (khuyến nghị production).
+    queue_backend: Literal["background", "arq"] = "background"
+
+    # === Job state store (Sprint 3.1) ===
+    # `memory`: dict in-process (single-process, dev/test).
+    # `redis`: Redis HASH share giữa API + worker process (bắt buộc khi queue=arq).
+    job_store_backend: Literal["memory", "redis"] = "memory"
+
+    # Redis/Arq settings
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str | None = None
+    redis_ssl: bool = False
+    arq_queue_name: str = "aquatrade:jobs"
+    arq_job_timeout_seconds: int = 3600
+    arq_job_keep_result_seconds: int = 2592000  # 30 days
+
+    # === Object storage (Sprint 3) ===
+    # Nếu false: giữ behavior cũ, trả file:// URL local.
+    object_storage_enabled: bool = False
+    object_storage_backend: Literal["minio"] = "minio"
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_secure: bool = False
+    minio_bucket: str = "aquatrade-ai"
+    minio_presign_expiry_seconds: int = 604800  # 7 days
+
     @property
     def webhook_url(self) -> str:
         base = self.backend_base_url.rstrip("/")
         path = "/" + self.webhook_path.lstrip("/")
         return base + path
+
+    @property
+    def redis_dsn(self) -> str:
+        scheme = "rediss" if self.redis_ssl else "redis"
+        auth = ""
+        if self.redis_password:
+            auth = f":{self.redis_password}@"
+        return f"{scheme}://{auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
 @lru_cache(maxsize=1)

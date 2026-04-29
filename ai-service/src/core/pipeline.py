@@ -104,10 +104,15 @@ def analyze_video(
 
     uniformity = _aggregate_uniformity(per_frame_weights)
     dead_fish_count = _count_distinct_dead(counter)
+    smart_stop_triggered = bool(
+        config.enable_smart_stop
+        and getattr(counter, "stability_progress", 0.0) >= 1.0
+    )
     health_score = _compute_health_score(
         fai_samples=per_frame_fai,
         dead_ratio=(dead_fish_count / final_count) if final_count > 0 else 0.0,
         uniformity=uniformity,
+        smart_stop_triggered=smart_stop_triggered,
     )
 
     elapsed_total = time.perf_counter() - t0
@@ -127,10 +132,7 @@ def analyze_video(
         extras={
             "fishProfile": config.fish_profile,
             "maxPeakDetection": int(getattr(counter, "max_detection_count", 0)),
-            "smartStopTriggered": bool(
-                config.enable_smart_stop
-                and getattr(counter, "stability_progress", 0.0) >= 1.0
-            ),
+            "smartStopTriggered": smart_stop_triggered,
         },
     )
 
@@ -211,13 +213,16 @@ def _compute_health_score(
     fai_samples: list[float],
     dead_ratio: float,
     uniformity: UniformityStats,
+    smart_stop_triggered: bool = True,
 ) -> float:
-    """Map FAI + dead + uniformity → điểm sức khỏe 0..100.
+    """Map FAI + dead + uniformity + stability -> điểm sức khỏe 0..100.
 
     Công thức khởi tạo (cần calibrate dữ liệu thực):
       * Sweet spot FAI: 30..70. Lệch khỏi 50 càng nhiều, càng trừ điểm.
       * Tỉ lệ cá chết: mỗi 1% trừ 5 điểm.
       * CV > 0.15 bị trừ điểm (lứa càng loạn size, điểm càng thấp).
+      * Smart Stop không trigger -> trừ 30 điểm (bằng chứng video không ổn định,
+        AI không chốt được con số trong thời gian patience -> độ tin cậy thấp).
     """
     if not fai_samples:
         return 0.0
@@ -226,8 +231,9 @@ def _compute_health_score(
     activity = max(0.0, 100.0 - abs(50.0 - fai_avg) * 2.0)
     mortality_penalty = float(dead_ratio) * 500.0
     uniformity_penalty = max(0.0, (uniformity.cv - 0.15) * 100.0)
+    instability_penalty = 0.0 if smart_stop_triggered else 30.0
 
-    score = activity - mortality_penalty - uniformity_penalty
+    score = activity - mortality_penalty - uniformity_penalty - instability_penalty
     return max(0.0, min(100.0, float(score)))
 
 

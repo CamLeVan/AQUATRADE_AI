@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  ai-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aquatrade-ai-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-me}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://host.docker.internal:8080}
+      MODEL_PATH: ${MODEL_PATH:-models/best.pt}
+      MODEL_VERSION: ${MODEL_VERSION:-unknown}
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-arq}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      OBJECT_STORAGE_ENABLED: ${OBJECT_STORAGE_ENABLED:-true}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: ${MINIO_BUCKET:-aquatrade-ai}
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aquatrade-ai-worker
+    restart: unless-stopped
+    command: ["arq", "src.api.worker.WorkerSettings"]
+    environment:
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-me}
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL:-http://host.docker.internal:8080}
+      MODEL_PATH: ${MODEL_PATH:-models/best.pt}
+      MODEL_VERSION: ${MODEL_VERSION:-unknown}
+      QUEUE_BACKEND: ${QUEUE_BACKEND:-arq}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      OBJECT_STORAGE_ENABLED: ${OBJECT_STORAGE_ENABLED:-true}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: ${MINIO_BUCKET:-aquatrade-ai}
+    depends_on:
+      - redis
+      - minio
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+
+  redis:
+    image: redis:7-alpine
+    container_name: aquatrade-ai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    container_name: aquatrade-ai-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  minio_data:
+
