@@ -64,13 +64,19 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Email đã tồn tại trong hệ thống");
         }
 
+        // Prevent Mass Assignment: User cannot register as ADMIN
+        com.aquatrade.core.domain.enums.Role role = request.getRole();
+        if (role == com.aquatrade.core.domain.enums.Role.ADMIN) {
+            throw new IllegalArgumentException("Không thể đăng ký với quyền ADMIN");
+        }
+
         // BCrypt encrypt password
         User newUser = User.builder()
                 .fullName(request.getFullName())
                 .companyName(request.getCompanyName())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole())
+                .role(role)
                 .status(UserStatus.ACTIVE)
                 .walletBalance(BigDecimal.ZERO)
                 .build();

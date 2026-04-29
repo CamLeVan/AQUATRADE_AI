@@ -8,5 +8,8 @@ public interface OrderService {
     OrderDto.OrderResponse createOrder(OrderDto.CreateOrderRequest request);
     OrderDto.OrderResponse getOrderById(UUID id);
     List<OrderDto.OrderResponse> getMyOrders();
+    void confirmOrderQuantity(UUID id);
+    void updateDigitalProof(UUID id, UUID proofId, com.aquatrade.core.dto.AIDetectionDto.DonePayload aiResult);
+    void startAiAnalysis(UUID id, String videoUrl, String batchName);
     void completeOrder(UUID id);
 }

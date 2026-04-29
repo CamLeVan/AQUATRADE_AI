@@ -45,9 +45,9 @@ public class Order extends BaseObject {
     @Column(name = "shipping_address", columnDefinition = "TEXT")
     private String shippingAddress;
 
-    // Liên kết 1-1 với bằng chứng số do AI xuất ra (nạp Lazy để khỏi lụt)
-    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private DigitalProof digitalProof;
+    // Liên kết 1-N với bằng chứng số do AI xuất ra
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private java.util.List<DigitalProof> proofs;
 
     // [SECURITY] Optimistic Locking — chặn Double Refund / Double Complete race condition
     @Version

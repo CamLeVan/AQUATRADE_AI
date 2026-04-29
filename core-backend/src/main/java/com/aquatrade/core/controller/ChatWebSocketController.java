@@ -11,6 +11,13 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.time.LocalDateTime;
+import com.aquatrade.core.repository.ChatMessageRepository;
+import com.aquatrade.core.repository.OrderRepository;
+import com.aquatrade.core.repository.UserRepository;
+import com.aquatrade.core.domain.ChatMessage;
+import com.aquatrade.core.domain.Order;
+import com.aquatrade.core.domain.User;
 
 @Slf4j
 @Controller
@@ -18,17 +25,52 @@ import java.util.UUID;
 public class ChatWebSocketController {
 
     private final SimpMessagingTemplate messagingTemplate;
-    // (Inject ChatMessageRepository tại đây để lưu DB)
+    private final ChatMessageRepository chatMessageRepository;
+    private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
 
-    // Lắng nghe đường dẫn từ client: Gửi tới /app/chat/{orderId}/send
     @MessageMapping("/chat/{orderId}/send")
     @Transactional
-    public void sendMessage(@DestinationVariable UUID orderId, @Payload ChatDto.ChatMessage payload) {
+    public void sendMessage(@DestinationVariable UUID orderId, @Payload ChatDto.ChatMessage payload, java.security.Principal principal) {
         log.info("Nhận tin nhắn socket vào room Order {}: {}", orderId, payload.getContent());
 
-        // TODO: Lưu vào DB thông qua Repository
+        try {
+            // Security Fix: Prevent spoofing by getting sender ID directly from authenticated Principal
+            if (principal == null) {
+                throw new org.springframework.security.access.AccessDeniedException("Unauthenticated request");
+            }
+            UUID senderId = UUID.fromString(principal.getName());
 
-        // Broadcast (phát thanh) lập tức lại vào kênh cho người kia nghe thấy
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+            User sender = userRepository.findById(senderId)
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người gửi"));
+
+            ChatMessage chatMessage = ChatMessage.builder()
+                    .order(order)
+                    .sender(sender)
+                    .content(payload.getContent())
+                    .messageType(payload.getMessageType())
+                    .offerPrice(payload.getOfferPrice())
+                    .offerStatus(payload.getOfferStatus())
+                    .aiRecommendedPrice(payload.getAiRecommendedPrice())
+                    .build();
+
+            chatMessageRepository.save(chatMessage);
+            
+            // Set timestamp back to payload
+            payload.setTimestamp(chatMessage.getCreatedAt() != null ? chatMessage.getCreatedAt() : LocalDateTime.now());
+
+            messagingTemplate.convertAndSend("/topic/orders/" + orderId, payload);
+        } catch (Exception e) {
+            log.error("Lỗi khi lưu tin nhắn chat: {}", e.getMessage());
+            // Optionally, we could send an error message back to the user via a separate topic
+        }
+    }
+
+    @MessageMapping("/chat/{orderId}/preview")
+    public void handleTypingPreview(@DestinationVariable UUID orderId, @Payload ChatDto.ChatMessage payload) {
+        // Chỉ chuyển tiếp (broadcast), không lưu DB để đảm bảo hiệu năng
         messagingTemplate.convertAndSend("/topic/orders/" + orderId, payload);
     }
 }

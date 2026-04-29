@@ -26,6 +26,20 @@ public class OrderDto {
     }
 
     @Data
+    @NoArgsConstructor
+    public static class ConfirmOrderRequest {
+        // Không bắt Buyer nhập tay nữa, chỉ gọi API để đối soát AI
+    }
+
+    @Data
+    public static class StartAiRequest {
+        @jakarta.validation.constraints.NotBlank(message = "Video URL không được để trống")
+        private String videoUrl;
+        
+        private String batchName; // VD: "Thùng 1", "Mẻ 2"
+    }
+
+    @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
@@ -43,10 +57,8 @@ public class OrderDto {
         private OrderStatus status;
         private LocalDateTime createdAt;
 
-        // [FIX] Thay Object → DigitalProofSummary để FE truy cập trực tiếp các field
-        // aiMatchScore → digitalProof.confidenceScore
-        // evidenceUrl  → digitalProof.aiImageUrl
-        private DigitalProofSummary digitalProof;
+        // [FIX] Hỗ trợ danh sách Bằng chứng số cho Đếm AI Hai Chiều
+        private java.util.List<DigitalProofSummary> proofs;
     }
 
     /**
@@ -59,6 +71,8 @@ public class OrderDto {
     @AllArgsConstructor
     public static class DigitalProofSummary {
         private String id;
+        private String proofRole;           // "SELLER" hoặc "BUYER"
+        private String batchName;           // "Thùng 1", "Mẻ 2"
         private Integer aiFishCount;
         private BigDecimal confidenceScore; // 0.00 → 1.00
         private String aiImageUrl;          // Link ảnh bounding box (bằng chứng)

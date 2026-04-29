@@ -61,6 +61,10 @@ public class WalletServiceImpl implements WalletService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy user"));
 
+        if (request.getAmount() == null || request.getAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Số tiền nạp phải lớn hơn 0");
+        }
+
         // Cập nhật số dư
         java.math.BigDecimal newBalance = user.getWalletBalance().add(request.getAmount());
         user.setWalletBalance(newBalance);

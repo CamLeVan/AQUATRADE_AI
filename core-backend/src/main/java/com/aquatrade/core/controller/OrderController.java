@@ -37,6 +37,22 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(orderService.getMyOrders()));
     }
 
+    @PostMapping("/{id}/confirm")
+    @PreAuthorize("hasRole('BUYER')")
+    public ResponseEntity<ApiResponse<String>> confirmOrderQuantity(@PathVariable String id) {
+        orderService.confirmOrderQuantity(UUID.fromString(id));
+        return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận đối soát tự động từ AI hai chiều."));
+    }
+
+    @PostMapping("/{id}/start-ai")
+    @PreAuthorize("hasAnyRole('SELLER', 'BUYER')")
+    public ResponseEntity<ApiResponse<String>> startAiAnalysis(
+            @PathVariable String id,
+            @Valid @RequestBody OrderDto.StartAiRequest request) {
+        orderService.startAiAnalysis(UUID.fromString(id), request.getVideoUrl(), request.getBatchName());
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi yêu cầu kiểm định sang bộ phận AI."));
+    }
+
     @PostMapping("/{id}/complete")
     @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
     public ResponseEntity<ApiResponse<String>> completeOrder(@PathVariable String id) {

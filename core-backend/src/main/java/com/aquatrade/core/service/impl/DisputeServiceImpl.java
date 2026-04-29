@@ -27,6 +27,9 @@ public class DisputeServiceImpl implements DisputeService {
     private final com.aquatrade.core.repository.TransactionRepository transactionRepository;
     private final com.aquatrade.core.repository.SystemTreasuryRepository systemTreasuryRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${app.commission.rate:0.05}")
+    private java.math.BigDecimal commissionRate;
+
     @Override
     public DisputeDto.DisputeResponse createDispute(String orderId, DisputeDto.CreateDisputeRequest request) {
         Order order = orderRepository.findById(UUID.fromString(orderId))
@@ -35,6 +38,11 @@ public class DisputeServiceImpl implements DisputeService {
         UUID userId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         User complainer = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy user"));
+
+        // IDOR Fix: Prevent arbitrary users from creating disputes on other people's orders
+        if (!order.getBuyer().getId().equals(userId) && !order.getListing().getSeller().getId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền tạo khiếu nại cho đơn hàng này.");
+        }
 
         // Lưu Dispute vào DB thật
         Dispute dispute = Dispute.builder()
@@ -67,8 +75,9 @@ public class DisputeServiceImpl implements DisputeService {
         }
 
         Order order = dispute.getOrder();
-        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED) {
-            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ, không thể hoàn tiền");
+        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED 
+            && order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.DISPUTED) {
+            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ hoặc tranh chấp, không thể hoàn tiền");
         }
 
         // 1. Hoàn tiền lại cho Buyer
@@ -108,8 +117,9 @@ public class DisputeServiceImpl implements DisputeService {
         }
 
         Order order = dispute.getOrder();
-        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED) {
-            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ");
+        if (order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.ESCROW_LOCKED
+            && order.getStatus() != com.aquatrade.core.domain.enums.OrderStatus.DISPUTED) {
+            throw new IllegalArgumentException("Đơn hàng không ở trạng thái tạm giữ hoặc tranh chấp");
         }
 
         order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.COMPLETED);
@@ -117,7 +127,7 @@ public class DisputeServiceImpl implements DisputeService {
 
         // Split tiền
         java.math.BigDecimal total = order.getTotalPrice();
-        java.math.BigDecimal commission = total.multiply(new java.math.BigDecimal("0.05"))
+        java.math.BigDecimal commission = total.multiply(commissionRate)
                 .setScale(0, java.math.RoundingMode.HALF_UP);
         java.math.BigDecimal sellerPayout = total.subtract(commission);
 

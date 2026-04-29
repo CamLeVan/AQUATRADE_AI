@@ -15,13 +15,11 @@ public class CMSPostController {
 
     private final CMSPostServiceImpl cmsPostService;
 
-    // Ai cũng đọc được tin tức (Trang chủ Marketing)
     @GetMapping
     public ResponseEntity<ApiResponse<Object>> getAllPosts() {
         return ResponseEntity.ok(ApiResponse.success(cmsPostService.getAllPosts()));
     }
 
-    // Chỉ Admin mới được quyền đăng bài
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CMSPostDto>> createPost(@RequestBody CMSPostDto dto) {

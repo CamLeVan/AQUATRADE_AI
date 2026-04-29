@@ -32,6 +32,8 @@ public class AIDetectionDto {
         private String orderId;
         private Integer aiFishCount;       // Số con chính thức (kết quả 95th Percentile)
         private BigDecimal confidenceScore; // Độ chính xác (0.00 → 1.00)
+        private Integer healthScore;        // Chỉ số sức khỏe (0-100) dựa trên vận động
+        private String qualityStatus;      // Cảnh báo chất lượng đầu vào (NORMAL/LOW)
         private String aiImageUrl;          // Link ảnh có bounding box
         private String proofHash;           // SHA-256 chống giả mạo
         private BigDecimal gpsLatitude;

@@ -16,9 +16,15 @@ import com.aquatrade.core.domain.base.BaseObject;
 @Builder
 public class DigitalProof extends BaseObject {
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
+
+    @Column(name = "proof_role", nullable = false)
+    private String proofRole; // "SELLER" or "BUYER"
+
+    @Column(name = "batch_name")
+    private String batchName;
 
     @Column(name = "ai_image_url")
     private String aiImageUrl;
@@ -28,6 +34,9 @@ public class DigitalProof extends BaseObject {
 
     @Column(name = "confidence_score", precision = 5, scale = 4)
     private BigDecimal confidenceScore;
+
+    @Column(name = "health_score")
+    private Integer healthScore;
 
     @Column(name = "gps_latitude", precision = 10, scale = 7)
     private BigDecimal gpsLatitude;

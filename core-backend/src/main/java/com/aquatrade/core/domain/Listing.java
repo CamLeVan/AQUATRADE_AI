@@ -51,6 +51,14 @@ public class Listing extends BaseObject {
     @Column(name = "province", nullable = false)
     private String province;
 
+    // [THÊM MỚI] Vị trí GPS của ao nuôi để verify với AI
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    // [THÊM MỚI] Ghi chú của Admin khi từ chối hoặc yêu cầu Seller chỉnh sửa tin đăng
     @Column(name = "moderation_note", columnDefinition = "TEXT")
     private String moderationNote;
 
