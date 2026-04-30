@@ -74,8 +74,9 @@ public class OrderDto {
         private String proofRole;           // "SELLER" hoặc "BUYER"
         private String batchName;           // "Thùng 1", "Mẻ 2"
         private Integer aiFishCount;
-        private BigDecimal confidenceScore; // 0.00 → 1.00
-        private String aiImageUrl;          // Link ảnh bounding box (bằng chứng)
+        private String status;
+        private String errorMessage;
+        private String aiImageUrl;
         private String proofHash;           // SHA-256 chống giả mạo (hiển thị 8 ký tự đầu)
         private LocalDateTime createdAt;
     }

@@ -32,6 +32,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.client.RestTemplate;
 import java.util.Map;
 import java.util.HashMap;
+import org.springframework.scheduling.annotation.Scheduled;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -161,7 +163,8 @@ public class OrderServiceImpl implements OrderService {
                         .proofRole(p.getProofRole())
                         .batchName(p.getBatchName())
                         .aiFishCount(p.getAiFishCount())
-                        .confidenceScore(p.getConfidenceScore())
+                        .status(p.getStatus())
+                        .errorMessage(p.getErrorMessage())
                         .aiImageUrl(p.getAiImageUrl())
                         .proofHash(p.getProofHash())
                         .createdAt(p.getCreatedAt())
@@ -270,24 +273,18 @@ public class OrderServiceImpl implements OrderService {
              throw new IllegalArgumentException("Proof does not belong to this order");
         }
 
-        double lat1 = order.getListing().getLatitude() != null ? order.getListing().getLatitude().doubleValue() : 0.0;
-        double lon1 = order.getListing().getLongitude() != null ? order.getListing().getLongitude().doubleValue() : 0.0;
-        double lat2 = aiResult.getGpsLatitude() != null ? aiResult.getGpsLatitude().doubleValue() : 0.0;
-        double lon2 = aiResult.getGpsLongitude() != null ? aiResult.getGpsLongitude().doubleValue() : 0.0;
-        
-        // Dùng GpsUtils để tính khoảng cách chuẩn theo công thức Haversine
-        double distance = com.aquatrade.core.utils.GpsUtils.calculateDistance(lat1, lon1, lat2, lon2);
-        
-        if (lat1 != 0.0 && distance > 0.5) { // 0.5 km
-            log.error("GPS Mismatch! Proof location too far from Pond location. Distance: {} km", distance);
+        if ("FAILED".equals(aiResult.getStatus())) {
+            proof.setStatus("FAILED");
+            proof.setErrorMessage(aiResult.getErrorMessage());
+            digitalProofRepository.save(proof);
+            messagingTemplate.convertAndSend("/topic/orders/" + orderId, aiResult);
+            return;
         }
 
         proof.setAiFishCount(aiResult.getAiFishCount());
-        proof.setConfidenceScore(aiResult.getConfidenceScore());
         proof.setProofHash(aiResult.getProofHash());
         proof.setAiImageUrl(aiResult.getAiImageUrl());
-        proof.setGpsLatitude(aiResult.getGpsLatitude());
-        proof.setGpsLongitude(aiResult.getGpsLongitude());
+        proof.setStatus("SUCCESS");
         
         digitalProofRepository.save(proof);
         
@@ -349,6 +346,34 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.error("Failed to trigger AI Service for proof {}: {}", proof.getId(), e.getMessage());
             throw new RuntimeException("Hệ thống kiểm định AI đang bận hoặc gặp sự cố.");
+        }
+    }
+
+    /**
+     * Tự động quét các bản ghi DigitalProof bị kẹt ở trạng thái PENDING quá 10 phút.
+     * Chạy mỗi 5 phút một lần.
+     */
+    @Scheduled(fixedDelay = 300000) // 5 minutes
+    @Transactional
+    public void cleanupPendingProofs() {
+        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
+        List<DigitalProof> stuckProofs = digitalProofRepository.findByStatusAndCreatedAtBefore("PENDING", tenMinutesAgo);
+        
+        if (!stuckProofs.isEmpty()) {
+            log.info("Found {} stuck AI proofs. Marking as FAILED.", stuckProofs.size());
+            for (DigitalProof proof : stuckProofs) {
+                proof.setStatus("FAILED");
+                proof.setErrorMessage("AI Service timeout (10 minutes). Please try again.");
+                digitalProofRepository.save(proof);
+                
+                // Notify FE via WebSocket
+                AIDetectionDto.DonePayload failPayload = AIDetectionDto.DonePayload.builder()
+                        .status("FAILED")
+                        .orderId(proof.getOrder().getId().toString())
+                        .errorMessage(proof.getErrorMessage())
+                        .build();
+                messagingTemplate.convertAndSend("/topic/orders/" + proof.getOrder().getId(), failPayload);
+            }
         }
     }
 }

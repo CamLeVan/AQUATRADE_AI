@@ -21,6 +21,9 @@ public class CloudinaryService {
     @Value("${cloudinary.api-secret}")
     private String apiSecret;
 
+    @Value("${cloudinary.video-preset}")
+    private String videoPreset;
+
     /**
      * Tạo chữ ký bảo mật để Frontend có thể upload trực tiếp lên Cloudinary.
      * @return DTO chứa signature và timestamp
@@ -35,8 +38,8 @@ public class CloudinaryService {
         
         Map<String, Object> params = new HashMap<>();
         params.put("timestamp", timestamp);
-        // Folder mặc định cho video cá để dễ quản lý trên Cloudinary Dashboard
-        params.put("folder", "aquatrade/fish_videos");
+        params.put("upload_preset", videoPreset);
+        params.put("folder", "aquatrade/videos");
 
         String signature = cloudinary.apiSignRequest(params, apiSecret);
 
@@ -45,6 +48,7 @@ public class CloudinaryService {
                 .timestamp(timestamp)
                 .apiKey(apiKey)
                 .cloudName(cloudName)
+                .uploadPreset(videoPreset)
                 .build();
     }
 }

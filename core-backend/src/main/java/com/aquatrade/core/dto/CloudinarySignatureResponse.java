@@ -10,4 +10,5 @@ public class CloudinarySignatureResponse {
     private Long timestamp;
     private String apiKey;
     private String cloudName;
+    private String uploadPreset;
 }
