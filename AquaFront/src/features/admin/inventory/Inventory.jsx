@@ -9,21 +9,62 @@ const Inventory = () => {
     const [loading, setLoading] = useState(true);
     const [filterCategory, setFilterCategory] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
+    const [selectedListing, setSelectedListing] = useState(null);
     const itemsPerPage = 8;
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [listingsRes, statsRes] = await Promise.all([
-                api.get('/admin/listings'),
-                api.get('/admin/stats')
-            ]);
-            setListings(listingsRes.data.data);
-            setStats(statsRes.data.data);
+            // Lấy thông tin user để biết role
+            const userRes = await api.get('/users/me');
+            const user = userRes.data.data;
+            const isAdmin = user.role === 'ADMIN';
+
+            // Chọn API phù hợp với vai trò
+            const listingsPath = isAdmin ? '/admin/listings' : '/listings/my-listings';
+            
+            // Đối với seller, stats sẽ được tính toán từ danh sách listings trả về
+            const listingsRes = await api.get(listingsPath);
+            
+            if (listingsRes.data.status === 'success') {
+                const data = listingsRes.data.data;
+                setListings(data);
+                
+                if (!isAdmin) {
+                    // Tự tính toán stats cho seller
+                    const totalKg = data.reduce((sum, l) => sum + (l.availableQuantity || 0), 0);
+                    setStats({
+                        totalStock: totalKg,
+                        aiAccuracy: 99.8,
+                        lowStockCount: data.filter(l => (l.availableQuantity || 0) < 50).length
+                    });
+                }
+            }
+
+            if (isAdmin) {
+                const statsRes = await api.get('/admin/stats');
+                if (statsRes.data.status === 'success') {
+                    setStats(statsRes.data.data);
+                }
+            }
         } catch (error) {
             console.error('Lỗi khi tải dữ liệu Inventory:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteListing = async (id) => {
+        if (window.confirm('Bạn có chắc chắn muốn gỡ bài đăng này khỏi hệ thống?')) {
+            try {
+                const response = await api.delete(`/listings/${id}`);
+                if (response.data.status === 'success') {
+                    alert('Đã gỡ bài đăng thành công!');
+                    fetchData();
+                }
+            } catch (error) {
+                alert('Lỗi khi xóa: ' + (error.response?.data?.message || error.message));
+            }
         }
     };
 
@@ -85,10 +126,12 @@ const Inventory = () => {
                     <div className="bg-[#13ecc8]/10 p-6 rounded-xl shadow-sm border border-[#13ecc8]/20 flex items-center justify-between relative overflow-hidden group">
                         <div className="relative z-10">
                             <p className="text-[10px] uppercase tracking-widest text-cyan-800 font-bold mb-1">CHỈ SỐ SỨC KHỎE AI</p>
-                            <h3 className="text-3xl font-extrabold text-cyan-900">92%</h3>
+                            <h3 className="text-3xl font-extrabold text-cyan-900">{stats?.aiAccuracy || 99.9}%</h3>
                             <div className="flex items-center gap-2 mt-2">
                                 <div className="w-2 h-2 rounded-full bg-[#13ecc8] animate-pulse"></div>
-                                <p className="text-xs text-cyan-800/70 font-bold uppercase tracking-tighter">Hệ thống vận hành tối ưu</p>
+                                <p className="text-xs text-cyan-800/70 font-bold uppercase tracking-tighter">
+                                    {(stats?.aiAccuracy || 0) > 95 ? 'Hệ thống vận hành tối ưu' : 'Đang giám sát hệ thống'}
+                                </p>
                             </div>
                         </div>
                         <div className="bg-[#13ecc8]/20 p-4 rounded-xl relative z-10">
@@ -114,14 +157,14 @@ const Inventory = () => {
                                     Tất cả
                                 </button>
                                 <button 
-                                    onClick={() => setFilterCategory('SHRIMP')}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'SHRIMP' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    onClick={() => setFilterCategory('TOM')}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'TOM' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     Tôm
                                 </button>
                                 <button 
-                                    onClick={() => setFilterCategory('FISH')}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'FISH' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    onClick={() => setFilterCategory('CA')}
+                                    className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${filterCategory === 'CA' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     Cá
                                 </button>
@@ -188,8 +231,20 @@ const Inventory = () => {
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-[#13ecc8] transition-all" title="Xem chi tiết"><span className="material-icons-outlined text-sm">visibility</span></button>
-                                                <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-all" title="Gỡ tin"><span className="material-icons-outlined text-sm">delete_outline</span></button>
+                                                <button 
+                                                    onClick={() => setSelectedListing(listing)}
+                                                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-[#13ecc8] transition-all" 
+                                                    title="Xem chi tiết"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">visibility</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteListing(listing.id)}
+                                                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-all" 
+                                                    title="Gỡ tin"
+                                                >
+                                                    <span className="material-icons-outlined text-sm">delete_outline</span>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -235,6 +290,60 @@ const Inventory = () => {
                         </div>
                     </div>
                 </div>
+                {/* Detail Modal */}
+                {selectedListing && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="relative h-48 bg-slate-100">
+                                <img src={selectedListing.thumbnailUrl || 'https://via.placeholder.com/600x400'} alt="" className="w-full h-full object-cover" />
+                                <button 
+                                    onClick={() => setSelectedListing(null)}
+                                    className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center"
+                                >
+                                    <span className="material-icons-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-800">{selectedListing.title}</h3>
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{selectedListing.category} • {selectedListing.species}</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Số lượng tồn</p>
+                                        <p className="text-sm font-bold text-slate-800">{selectedListing.availableQuantity} kg</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Giá mỗi con</p>
+                                        <p className="text-sm font-bold text-[#13ecc8]">{selectedListing.pricePerFish?.toLocaleString()} ₫</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Kích thước</p>
+                                        <p className="text-sm font-bold text-slate-800">{selectedListing.sizeMin} - {selectedListing.sizeMax} cm</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Tỉnh thành</p>
+                                        <p className="text-sm font-bold text-slate-800">{selectedListing.province}</p>
+                                    </div>
+                                </div>
+                                <div className="pt-4 flex gap-3">
+                                    <button 
+                                        onClick={() => setSelectedListing(null)}
+                                        className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all"
+                                    >
+                                        Đóng
+                                    </button>
+                                    <button 
+                                        onClick={() => { handleDeleteListing(selectedListing.id); setSelectedListing(null); }}
+                                        className="flex-1 py-3 bg-red-50 text-red-600 font-bold rounded-xl hover:bg-red-100 transition-all"
+                                    >
+                                        Gỡ bài đăng
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <Footer/>
             </div>
         </AdminLayout>

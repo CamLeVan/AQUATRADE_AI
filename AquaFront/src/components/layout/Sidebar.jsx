@@ -19,6 +19,7 @@ const Sidebar = () => {
         { path: '/ai-detection', label: 'Analytics', icon: 'insights' },
         { path: '/orders', label: 'Logistics', icon: 'local_shipping' },
         { path: '/wallet', label: 'Wallet', icon: 'account_balance_wallet' },
+        ...(userRole !== 'ADMIN' ? [{ path: '/checkout', label: 'Cart', icon: 'shopping_cart' }] : []),
         { path: '/chat', label: 'AI Chat', icon: 'chat' },
         { path: '/settings', label: 'Settings', icon: 'settings' },
     ];

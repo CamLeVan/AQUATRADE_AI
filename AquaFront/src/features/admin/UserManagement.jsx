@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from './layout/AdminLayout';
 import api from '../../services/api';
+import { notify } from '../../utils/toast';
 
 const UserManagement = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -19,7 +20,7 @@ const UserManagement = () => {
     // Filter and Pagination state
     const [filters, setFilters] = useState({ role: 'ALL', status: 'ALL' });
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 8;
+    const itemsPerPage = 5;
 
     const fetchData = async () => {
         setLoading(true);
@@ -45,12 +46,12 @@ const UserManagement = () => {
         e.preventDefault();
         try {
             await api.post('/admin/users', newUser);
-            alert('Tạo người dùng thành công!');
+            notify.success('Tạo người dùng thành công!');
             setIsAddModalOpen(false);
             setNewUser({ fullName: '', email: '', password: 'Password123!', role: 'BUYER' });
             fetchData();
         } catch (error) {
-            alert('Lỗi: ' + (error.response?.data?.message || error.message));
+            notify.error('Lỗi: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -58,9 +59,10 @@ const UserManagement = () => {
         const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
         try {
             await api.put(`/admin/users/${userId}/status`, { newStatus });
+            notify.success(newStatus === 'ACTIVE' ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản');
             fetchData();
         } catch (error) {
-            alert('Lỗi khi cập nhật trạng thái user');
+            notify.error('Lỗi khi cập nhật trạng thái user');
         }
     };
 

@@ -47,7 +47,9 @@ const Postings = () => {
     const fetchMyListings = async () => {
         try {
             const response = await api.get('/listings/my-listings');
-            setMyListings(response.data.data);
+            if (response.data.status === 'success') {
+                setMyListings(response.data.data);
+            }
         } catch (error) {
             console.error('Lỗi khi tải danh sách của tôi:', error);
         }
@@ -59,9 +61,11 @@ const Postings = () => {
 
     const handleUpdatePrice = async (id, newPrice) => {
         try {
-            await api.patch(`/listings/${id}/price`, { price: parseFloat(newPrice) });
-            alert('Cập nhật giá thành công!');
-            fetchMyListings();
+            const response = await api.patch(`/listings/${id}/price`, { price: parseFloat(newPrice) });
+            if (response.data.status === 'success') {
+                alert('Cập nhật giá thành công!');
+                fetchMyListings();
+            }
         } catch (error) {
             alert('Lỗi khi cập nhật giá: ' + (error.response?.data?.message || error.message));
         }
@@ -76,11 +80,13 @@ const Postings = () => {
     const handleDeleteListing = async (id) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa bài đăng này?')) {
             try {
-                await api.delete(`/listings/${id}`);
-                alert('Xóa bài đăng thành công!');
-                fetchMyListings();
+                const response = await api.delete(`/listings/${id}`);
+                if (response.data.status === 'success') {
+                    alert('Xóa bài đăng thành công!');
+                    fetchMyListings();
+                }
             } catch (error) {
-                alert('Lỗi khi xóa bài đăng: ' + (error.response?.data?.message || error.message));
+                alert('Lỗi khi xóa: ' + (error.response?.data?.message || error.message));
             }
         }
     };
@@ -332,16 +338,28 @@ const Postings = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Số lượng ước tính</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Số lượng ước tính (con)</label>
                                     <input 
                                         name="estimatedQuantity"
                                         value={formData.estimatedQuantity}
                                         onChange={handleInputChange}
-                                        className="w-full bg-slate-50 border-none rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-cyan-500 outline-none text-slate-800" 
+                                        className="w-full bg-slate-50 border-none rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-cyan-500 outline-none text-slate-800 font-bold" 
                                         type="number" 
                                         placeholder="Ví dụ: 5000"
                                         required
                                     />
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {[10, 50, 100, 500, 1000].map(amt => (
+                                            <button
+                                                key={amt}
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, estimatedQuantity: (parseInt(prev.estimatedQuantity) || 0) + amt }))}
+                                                className="px-2 py-1 text-[9px] font-black bg-slate-100 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 rounded transition-all border border-slate-200/50"
+                                            >
+                                                +{amt}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kích thước Min (cm)</label>

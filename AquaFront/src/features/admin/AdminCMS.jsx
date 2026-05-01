@@ -1,8 +1,146 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from './layout/AdminLayout';
+import api from '../../services/api';
 
 const AdminCMS = () => {
+    const [posts, setPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [aiSuggestion, setAiSuggestion] = useState("Hãy nhập tiêu đề để nhận gợi ý từ AI...");
+    const [editingPost, setEditingPost] = useState(null);
+    const fileInputRef = useRef(null);
+    const [formData, setFormData] = useState({
+        title: '',
+        category: 'MARKETING',
+        content: '',
+        status: 'PUBLISHED',
+        featuredImageUrl: ''
+    });
+
+    const fetchPosts = async () => {
+        setLoading(true);
+        try {
+            const response = await api.get('/posts');
+            if (response.data.status === 'success') {
+                setPosts(response.data.data);
+            }
+        } catch (error) {
+            console.error('Lỗi khi tải bài viết:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPosts();
+    }, []);
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Logic gợi ý AI đơn giản dựa trên từ khóa
+        if (name === 'title' && value.length > 5) {
+            const val = value.toLowerCase();
+            if (val.includes('tôm')) {
+                setAiSuggestion("AI khuyên bạn nên dùng ảnh cận cảnh tôm tươi để tăng 25% tỷ lệ tương tác.");
+            } else if (val.includes('cá')) {
+                setAiSuggestion("Các bài viết về Cá giống thường hiệu quả hơn khi đính kèm biểu đồ tăng trưởng.");
+            } else if (val.includes('giá') || val.includes('thị trường')) {
+                setAiSuggestion("Người dùng quan tâm đến bảng giá. Hãy sử dụng bảng dữ liệu trong nội dung.");
+            } else {
+                setAiSuggestion("AI đang phân tích tiêu đề của bạn để đưa ra phong cách hình ảnh phù hợp...");
+            }
+        }
+    };
+
+    const handleOptimizeTitle = () => {
+        if (!formData.title) return;
+        const optimized = " AquaTrade Phân Tích: " + formData.title + " (Cập nhật 2024)";
+        setFormData(prev => ({ ...prev, title: optimized }));
+        setAiSuggestion("Tiêu đề đã được AI tối ưu hóa để chuẩn SEO và thu hút click hơn!");
+    };
+
+    const handleImageClick = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Hiển thị preview ngay lập tức
+            const reader = new FileReader();
+            reader.onloadend = () => setImagePreview(reader.result);
+            reader.readAsDataURL(file);
+
+            // Tải ảnh lên backend
+            const uploadData = new FormData();
+            uploadData.append('file', file);
+            try {
+                const res = await api.post('/files/upload', uploadData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                if (res.data.status === 'success') {
+                    setFormData(prev => ({ ...prev, featuredImageUrl: res.data.data }));
+                }
+            } catch (error) {
+                alert('Lỗi khi tải ảnh lên!');
+            }
+        }
+    };
+
+    const handleEditPost = (post) => {
+        setEditingPost(post);
+        setFormData({
+            title: post.title,
+            category: post.category,
+            content: post.content,
+            status: post.status,
+            featuredImageUrl: post.featuredImageUrl
+        });
+        setImagePreview(post.featuredImageUrl);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeletePost = async (id) => {
+        if (window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+            try {
+                const response = await api.delete(`/posts/${id}`);
+                if (response.data.status === 'success') {
+                    alert('Xóa bài viết thành công!');
+                    fetchPosts();
+                }
+            } catch (error) {
+                alert('Lỗi khi xóa: ' + (error.response?.data?.message || error.message));
+            }
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            let response;
+            if (editingPost) {
+                response = await api.put(`/posts/${editingPost.id}`, formData);
+            } else {
+                response = await api.post('/posts', {
+                    ...formData,
+                    author: 'Admin'
+                });
+            }
+
+            if (response.data.status === 'success') {
+                alert(editingPost ? 'Cập nhật thành công!' : 'Đăng bài thành công!');
+                setFormData({ title: '', category: 'MARKETING', content: '', status: 'PUBLISHED', featuredImageUrl: '' });
+                setImagePreview(null);
+                setEditingPost(null);
+                fetchPosts();
+            }
+        } catch (error) {
+            alert('Lỗi: ' + (error.response?.data?.message || error.message));
+        }
+    };
     return (
         <AdminLayout>
             <div className="p-8 space-y-8 max-w-[1600px] mx-auto w-full">
@@ -63,20 +201,59 @@ const AdminCMS = () => {
                     {/* Editor Main Form */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm">
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6">Biên tập nội dung mới</h3>
-                            <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                                    {editingPost ? 'Chỉnh sửa bài viết' : 'Biên tập nội dung mới'}
+                                </h3>
+                                {editingPost && (
+                                    <button 
+                                        onClick={() => {
+                                            setEditingPost(null);
+                                            setFormData({ title: '', category: 'MARKETING', content: '', status: 'PUBLISHED', featuredImageUrl: '' });
+                                            setImagePreview(null);
+                                        }}
+                                        className="text-[10px] font-bold text-red-500 uppercase hover:underline"
+                                    >
+                                        Hủy chỉnh sửa
+                                    </button>
+                                )}
+                            </div>
+                            <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
-                                    <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Tiêu đề bài viết</label>
-                                    <input className="w-full bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-[#13ecc8]/30 focus:border-[#13ecc8] rounded-lg px-4 py-3 text-sm font-medium transition-all" placeholder="VD: Phân tích xu hướng thị trường AquaTrade Quý 3..." type="text"/>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Tiêu đề bài viết</label>
+                                        <button 
+                                            type="button"
+                                            onClick={handleOptimizeTitle}
+                                            className="text-[9px] font-black text-[#00cfa8] uppercase flex items-center gap-1 hover:underline"
+                                        >
+                                            <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                                            Tối ưu tiêu đề với AI
+                                        </button>
+                                    </div>
+                                    <input 
+                                        name="title"
+                                        value={formData.title}
+                                        onChange={handleInputChange}
+                                        className="w-full bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-[#13ecc8]/30 focus:border-[#13ecc8] rounded-lg px-4 py-3 text-sm font-medium transition-all" 
+                                        placeholder="VD: Phân tích xu hướng thị trường AquaTrade Quý 3..." 
+                                        type="text"
+                                        required
+                                    />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Chuyên mục</label>
                                         <div className="relative">
-                                            <select className="appearance-none w-full bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-[#13ecc8]/30 focus:border-[#13ecc8] rounded-lg px-4 py-3 text-sm transition-all font-medium cursor-pointer">
-                                                <option>Market Updates</option>
-                                                <option>Technical Guides</option>
-                                                <option>Industry News</option>
+                                            <select 
+                                                name="category"
+                                                value={formData.category}
+                                                onChange={handleInputChange}
+                                                className="appearance-none w-full bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-[#13ecc8]/30 focus:border-[#13ecc8] rounded-lg px-4 py-3 text-sm transition-all font-medium cursor-pointer"
+                                            >
+                                                <option value="MARKETING">Market Updates</option>
+                                                <option value="TECH">Technical Guides</option>
+                                                <option value="NEWS">Industry News</option>
                                             </select>
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-slate-400">expand_more</span>
                                         </div>
@@ -84,7 +261,12 @@ const AdminCMS = () => {
                                     <div className="flex flex-col justify-end">
                                         <label className="flex items-center cursor-pointer gap-3 mb-3">
                                             <div className="relative">
-                                                <input defaultChecked className="sr-only peer" type="checkbox"/>
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={formData.status === 'PUBLISHED'}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.checked ? 'PUBLISHED' : 'DRAFT' }))}
+                                                    className="sr-only peer" 
+                                                />
                                                 <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#13ecc8]"></div>
                                             </div>
                                             <span className="text-xs font-bold uppercase tracking-widest text-slate-600">Hiển thị ngay (Publish Now)</span>
@@ -95,20 +277,35 @@ const AdminCMS = () => {
                                     <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Trình soạn thảo văn bản</label>
                                     <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#13ecc8]/30 focus-within:border-[#13ecc8] transition-all">
                                         <div className="bg-slate-50 px-4 py-2 flex items-center gap-4 border-b border-slate-200 flex-wrap">
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_bold</span></button>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span class="material-symbols-outlined text-lg">format_italic</span></button>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_underlined</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_bold</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_italic</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_underlined</span></button>
                                             <div className="w-px h-4 bg-slate-300"></div>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_list_bulleted</span></button>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_list_numbered</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_list_bulleted</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">format_list_numbered</span></button>
                                             <div className="w-px h-4 bg-slate-300"></div>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">link</span></button>
-                                            <button className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">image</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">link</span></button>
+                                            <button type="button" className="p-1 text-slate-600 hover:text-[#13ecc8] transition-colors"><span className="material-symbols-outlined text-lg">image</span></button>
                                         </div>
-                                        <textarea className="w-full bg-white border-none focus:ring-0 outline-none px-4 py-4 text-sm leading-relaxed min-h-[300px] resize-y" placeholder="Bắt đầu viết nội dung tại đây..."></textarea>
+                                        <textarea 
+                                            name="content"
+                                            value={formData.content}
+                                            onChange={handleInputChange}
+                                            className="w-full bg-white border-none focus:ring-0 outline-none px-4 py-4 text-sm leading-relaxed min-h-[300px] resize-y" 
+                                            placeholder="Bắt đầu viết nội dung tại đây..."
+                                            required
+                                        ></textarea>
                                     </div>
                                 </div>
-                            </div>
+                                <div className="flex gap-4">
+                                    <button 
+                                        type="submit"
+                                        className={`flex-1 ${editingPost ? 'bg-blue-500' : 'bg-[#13ecc8]'} text-slate-900 py-3 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform hover:opacity-90`}
+                                    >
+                                        {editingPost ? 'Cập nhật bài viết' : 'Xuất bản ngay'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
 
@@ -116,12 +313,28 @@ const AdminCMS = () => {
                     <div className="space-y-6">
                         <div className="bg-white rounded-xl p-8 border border-slate-100 shadow-sm h-full flex flex-col">
                             <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6">Ảnh tiêu biểu (Featured)</h3>
-                            <div className="border-2 border-dashed border-[#13ecc8]/30 rounded-xl p-8 flex flex-col items-center justify-center text-center group hover:border-[#13ecc8] transition-colors cursor-pointer bg-[#13ecc8]/5 min-h-[200px]">
-                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-[#00cfa8] mb-4 group-hover:scale-110 transition-transform">
-                                    <span className="material-symbols-outlined text-2xl">cloud_upload</span>
-                                </div>
-                                <p className="text-sm font-bold text-slate-700 mb-1">Click to upload or drag</p>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase">PNG, JPG, WEBP up to 5MB</p>
+                            <div 
+                                onClick={handleImageClick}
+                                className="relative border-2 border-dashed border-[#13ecc8]/30 rounded-xl p-4 flex flex-col items-center justify-center text-center group hover:border-[#13ecc8] transition-colors cursor-pointer bg-[#13ecc8]/5 min-h-[200px] overflow-hidden"
+                            >
+                                <input 
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleImageChange}
+                                    className="hidden"
+                                    accept="image/*"
+                                />
+                                {imagePreview ? (
+                                    <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                ) : (
+                                    <>
+                                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-[#00cfa8] mb-4 group-hover:scale-110 transition-transform">
+                                            <span className="material-symbols-outlined text-2xl">cloud_upload</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-700 mb-1">Click to upload or drag</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">PNG, JPG, WEBP up to 5MB</p>
+                                    </>
+                                )}
                             </div>
                             
                             <div className="mt-8 flex-1">
@@ -131,7 +344,7 @@ const AdminCMS = () => {
                                         <span className="material-symbols-outlined text-[#00cfa8] text-sm animate-pulse" style={{fontVariationSettings: "'FILL' 1"}}>auto_awesome</span>
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-[#006b59]">AI Recommendation</span>
                                     </div>
-                                    <p className="text-xs text-slate-600 leading-relaxed italic font-medium">"Dựa trên tiêu đề, hãy sử dụng hình ảnh có màu xanh ngọc chủ đạo để tăng tỷ lệ click lên 15%."</p>
+                                    <p className="text-xs text-slate-600 leading-relaxed italic font-medium">"{aiSuggestion}"</p>
                                 </div>
                             </div>
 
@@ -164,99 +377,54 @@ const AdminCMS = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                <tr className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
-                                    <td className="px-8 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
-                                                <img alt="Post thumbnail" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMJUHSaIuf-5913hbVCbWCrn_a8ZBLOpaRm0Ju3WtE74a4EkDCyLo2H-Vqtx8tom0yKNgq_7ev-uboIegcRcAPEaTZDzjOizoIwfcEZkf011Gex2Z2dBSCO5fI7NTSLvOK-jtwljvd36UZbUE3OwyXLQAqjUsrP7TX5Szd0Q_Nlyk_BWZLu4B_M8mzl3l9X5tE3Sj5DBkonxVabX0L4XrUTdei3b1IMXO3oitRq2TiwOeyw6Yjx4jRsE2V6pvoD6IgdqMfgN-FPNEo"/>
+                                {posts.map(post => (
+                                    <tr key={post.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+                                        <td className="px-8 py-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
+                                                    <img alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300" src={post.featuredImageUrl || "https://via.placeholder.com/150"}/>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-[#00cfa8] transition-colors">{post.title}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">Bởi {post.author} • {post.viewCount || 0} lượt xem</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-[#00cfa8] transition-colors">Tiềm năng xuất khẩu thủy sản 2024</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Cập nhật 2 giờ trước • Bởi Admin</p>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded">{post.category}</span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-2 h-2 rounded-full ${post.status === 'PUBLISHED' ? 'bg-[#13ecc8] shadow-[0_0_8px_rgba(19,236,200,0.6)] animate-pulse' : 'bg-amber-400'}`}></div>
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider ${post.status === 'PUBLISHED' ? 'text-[#00cfa8]' : 'text-amber-500'}`}>{post.status}</span>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded">Market Updates</span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-[#13ecc8] shadow-[0_0_8px_rgba(19,236,200,0.6)] animate-pulse"></div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#00cfa8]">Published</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-sm font-bold text-slate-700">12,402</span>
-                                    </td>
-                                    <td className="px-8 py-4 text-right">
-                                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-[#00cfa8] hover:bg-[#13ecc8]/10 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                            <button className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">delete</span></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
-                                    <td className="px-8 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
-                                                <img alt="Post thumbnail" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjrDW4LqssluQsh-t5DYckZ6UbmsJeicuTtPK5xL6sPiRmBbP0_gvfzpwAqaie-w3X86C5vLeuEX8EXaTzxiKbdnxkBfsX3I3LWvH2txmjdbmz9wq9c1q-QkQBr0TgedKziE7Jmv6ywrwy3TLJGxyXCGQSlxklRfjSoAeJU1AoNwZn_zi-Nikk-wPQvF3gP1bxQLqPiVFU67pvSjyFsb3Z4ZUm-uhr3t6ZrHpQYcNkw-AGT_YNax2Yt8MzzTU9it_i1xlBuXtjaDrq"/>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="text-sm font-bold text-slate-700">{post.viewCount?.toLocaleString() || 0}</span>
+                                        </td>
+                                        <td className="px-8 py-4 text-right">
+                                            <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button 
+                                                    onClick={() => handleEditPost(post)}
+                                                    className="p-1.5 text-slate-400 hover:text-[#00cfa8] hover:bg-[#13ecc8]/10 rounded-lg transition-all"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeletePost(post.id)}
+                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                >
+                                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                </button>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-[#00cfa8] transition-colors">Công nghệ lọc nước tuần hoàn RAS</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Cập nhật 1 ngày trước • Bởi Admin</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded">Tech Guides</span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500">Draft</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-sm font-bold text-slate-700">0</span>
-                                    </td>
-                                    <td className="px-8 py-4 text-right">
-                                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-[#00cfa8] hover:bg-[#13ecc8]/10 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                            <button className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">delete</span></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr className="hover:bg-slate-50/80 transition-colors group cursor-pointer">
-                                    <td className="px-8 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
-                                                <img alt="Post thumbnail" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAC9nerqIql7_PDlcF6mxvszQ4D7UT7GJAdGlaWJ_5iHgPVR6_V3xWcF1vC37F_pnxm7BrQydY9-Ej2wm3vGKCEbDbUA7HPPBhBnPPiSTkg7MLa6fs3x8Qa_wH6uxAFirogYfrnW8etemtcB7IW9ITYzQqQUVkJs_LTyfj418cARhav7ADKyMwZjHhUotkxLGS6CWNu_pN5b5hcDq_rdnILgHtj6OnW3KLqd7vseTVUnRVmDBPBWd6DdugSJHhvNK9pp0kIfCNirvtq"/>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-[#00cfa8] transition-colors">Báo cáo AI trong Logistic Thủy sản</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">Cập nhật 3 ngày trước • Bởi AI-Bot</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded">Industry News</span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-[#13ecc8] shadow-[0_0_8px_rgba(19,236,200,0.6)] animate-pulse"></div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#00cfa8]">Published</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className="text-sm font-bold text-slate-700">8,912</span>
-                                    </td>
-                                    <td className="px-8 py-4 text-right">
-                                        <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-[#00cfa8] hover:bg-[#13ecc8]/10 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                            <button className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"><span className="material-symbols-outlined text-[18px]">delete</span></button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {posts.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="px-8 py-10 text-center text-slate-400 text-sm italic">Chưa có bài viết nào trong hệ thống.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
