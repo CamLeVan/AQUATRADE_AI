@@ -7,6 +7,7 @@ import MarketSidebar from '../features/dashboard/MarketSidebar';
 import MarketTrends from '../features/dashboard/MarketTrends';
 import RecommendedSuppliers from '../features/marketplace/RecommendedSuppliers';
 import RecentTransactions from '../features/dashboard/RecentTransactions';
+import RecentNews from '../features/dashboard/RecentNews';
 import Footer from '../components/layout/Footer';
 
 const Dashboard = () => {
@@ -23,6 +24,7 @@ const Dashboard = () => {
                     </div>
                     <MarketTrends />
                     <RecommendedSuppliers />
+                    <RecentNews />
                     <RecentTransactions />
                 </div>
                 <Footer />

@@ -54,20 +54,23 @@ const Marketplace = () => {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {listings.length > 0 ? listings.map((item) => (
-                                <div key={item.id} className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-teal-500/5 shadow-sm hover:shadow-md transition-all group">
+                                <div key={item.id} className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden border border-teal-500/5 shadow-sm hover:shadow-lg transition-all group flex flex-col h-full relative">
+                                    {/* Make the whole card area clickable */}
+                                    <Link to={`/productdetail?id=${item.id}`} className="absolute inset-0 z-10" aria-label={`Xem chi tiết ${item.title}`}></Link>
+                                    
                                     <div className="relative h-48 overflow-hidden bg-slate-100">
                                         <img 
                                             alt={item.title} 
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                                            src={item.thumbnailUrl || 'https://via.placeholder.com/400x300?text=AquaTrade'}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                            src={item.thumbnailUrl || 'https://muoibienseafood.com/wp-content/uploads/2024/11/Phan-biet-tom-the-va-tom-su.jpg.webp'}
                                         />
                                         {item.aiVerified && (
-                                            <div className="absolute top-3 left-3 bg-teal-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg uppercase">AI Verified</div>
+                                            <div className="absolute top-3 left-3 bg-teal-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg uppercase z-20">AI Verified</div>
                                         )}
                                     </div>
-                                    <div className="p-5 flex flex-col h-full">
+                                    <div className="p-5 flex flex-col flex-1 relative z-20">
                                         <div className="flex justify-between items-start mb-2">
-                                            <h3 className="font-bold text-slate-800 dark:text-slate-100 leading-tight">{item.title}</h3>
+                                            <h3 className="font-bold text-slate-800 dark:text-slate-100 leading-tight group-hover:text-teal-500 transition-colors">{item.title}</h3>
                                         </div>
                                         <p className="text-[11px] text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                                             <span className="material-symbols-outlined text-xs">location_on</span> {item.province}
@@ -84,16 +87,15 @@ const Marketplace = () => {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between mt-auto">
-                                            <span className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                                                {(item.pricePerFish || 0).toLocaleString()} đ
-                                                <span className="text-xs font-normal text-slate-400">/con</span>
+                                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50 dark:border-slate-800">
+                                            <span className="text-lg font-black text-slate-900 dark:text-slate-100">
+                                                {(item.pricePerFish || 0).toLocaleString()} <span className="text-[10px] font-bold text-slate-400 uppercase">đ/con</span>
                                             </span>
-                                            <div className="flex gap-2">
-                                                <Link to="/negotiation" className="w-9 h-9 flex items-center justify-center border border-teal-500/20 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/40 transition-colors">
+                                            <div className="flex gap-2 relative z-30">
+                                                <Link to={`/negotiation?id=${item.id}`} className="w-9 h-9 flex items-center justify-center border border-teal-500/20 rounded-lg text-teal-600 hover:bg-teal-500 hover:text-white transition-all shadow-sm">
                                                     <span className="material-symbols-outlined text-lg">chat</span>
                                                 </Link>
-                                                <Link to={`/productdetail?id=${item.id}`} className="px-4 py-2 bg-slate-800 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg hover:bg-slate-900 transition-colors">Chi tiết</Link>
+                                                <Link to={`/productdetail?id=${item.id}`} className="px-4 py-2 bg-teal-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-teal-600 transition-all shadow-md shadow-teal-500/20">Chi tiết</Link>
                                             </div>
                                         </div>
                                     </div>

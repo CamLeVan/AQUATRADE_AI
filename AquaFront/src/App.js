@@ -14,6 +14,7 @@ import Marketplace from './features/marketplace/Marketplace';
 import MarketPrices from './features/marketplace/MarketPrices';
 import Wallet from './features/wallet/Wallet';
 import Checkout from './features/orders/Checkout';
+import NewsDetails from './features/dashboard/NewsDetails';
 import Settings from './features/settings/Settings';
 import Contact from './features/contact/Contact';
 import AdminDashboard from './features/admin/AdminDashboard';
@@ -43,6 +44,7 @@ function App() {
         <Route path="/prices" element={<MarketPrices />} />
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/news" element={<NewsDetails />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/support" element={<SupportCenter />} />
