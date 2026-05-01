@@ -37,4 +37,8 @@ public class DigitalProof extends BaseObject {
 
     @Column(name = "proof_hash", nullable = false)
     private String proofHash;
+
+    /** UUID ticket từ AI job — dùng để idempotent webhook (§2.6). */
+    @Column(name = "ai_ticket_id", unique = true, length = 64)
+    private String aiTicketId;
 }

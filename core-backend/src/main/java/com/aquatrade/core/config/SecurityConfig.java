@@ -40,6 +40,7 @@ public class SecurityConfig {
                 // === PUBLIC (không cần token) ===
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/test/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/internal/ai-webhook").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/listings/**").permitAll()
 
                 // === ADMIN ONLY ===
