@@ -19,6 +19,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final com.aquatrade.core.repository.ListingRepository listingRepository;
+    private final com.aquatrade.core.repository.CMSPostRepository cmsPostRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -91,6 +92,39 @@ public class DataInitializer implements CommandLineRunner {
             listingRepository.save(listing1);
             listingRepository.save(listing2);
             log.info(">>> Đã tạo 2 bài đăng mẫu đang chờ duyệt.");
+        }
+
+        // Tạo CMS Posts mẫu
+        if (cmsPostRepository.count() == 0) {
+            // Lấy user admin đã tạo ở trên để làm tác giả
+            com.aquatrade.core.domain.User adminUser = userRepository.findByEmail("admin@aquatrade.com")
+                    .orElse(null);
+
+            if (adminUser != null) {
+                com.aquatrade.core.domain.CMSPost post1 = com.aquatrade.core.domain.CMSPost.builder()
+                        .title("Tiềm năng xuất khẩu thủy sản 2024")
+                        .content("Nội dung phân tích về thị trường thủy sản Việt Nam trong năm 2024...")
+                        .category(com.aquatrade.core.domain.enums.PostCategory.MARKETING)
+                        .status(com.aquatrade.core.domain.enums.PostStatus.PUBLISHED)
+                        .author(adminUser) // Dùng đối tượng User thực tế
+                        .viewCount(1200)
+                        .featuredImageUrl("https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&q=80&w=400")
+                        .build();
+
+                com.aquatrade.core.domain.CMSPost post2 = com.aquatrade.core.domain.CMSPost.builder()
+                        .title("Công nghệ lọc nước tuần hoàn RAS")
+                        .content("Hướng dẫn chi tiết về hệ thống RAS trong nuôi tôm công nghiệp...")
+                        .category(com.aquatrade.core.domain.enums.PostCategory.TECH)
+                        .status(com.aquatrade.core.domain.enums.PostStatus.DRAFT)
+                        .author(adminUser) // Dùng đối tượng User thực tế
+                        .viewCount(0)
+                        .featuredImageUrl("https://images.unsplash.com/photo-1534321231932-e739d42830a9?auto=format&fit=crop&q=80&w=400")
+                        .build();
+
+                cmsPostRepository.save(post1);
+                cmsPostRepository.save(post2);
+                log.info(">>> Đã tạo 2 bài viết CMS mẫu.");
+            }
         }
     }
 }

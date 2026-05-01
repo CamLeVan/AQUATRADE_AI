@@ -36,6 +36,7 @@ public class UserServiceImpl implements UserService {
                 .companyName(user.getCompanyName())
                 .role(user.getRole())
                 .status(user.getStatus())
+                .walletBalance(user.getWalletBalance())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
