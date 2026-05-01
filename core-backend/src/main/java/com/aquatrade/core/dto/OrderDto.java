@@ -46,6 +46,7 @@ public class OrderDto {
     public static class OrderResponse {
         private String id;
         private String listingTitle;
+        private String listingThumbnailUrl;
         private String buyerName;
         private String sellerName;
         private BigDecimal unitPriceAtPurchase;

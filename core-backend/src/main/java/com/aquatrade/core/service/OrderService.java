@@ -11,5 +11,8 @@ public interface OrderService {
     void confirmOrderQuantity(UUID id);
     void updateDigitalProof(UUID id, UUID proofId, com.aquatrade.core.dto.AIDetectionDto.DonePayload aiResult);
     void startAiAnalysis(UUID id, String videoUrl, String batchName);
+    List<OrderDto.OrderResponse> getSellerOrders(UUID sellerId);
     void completeOrder(UUID id);
+    void adminReviewOrder(UUID orderId, Integer finalQuantity);
+    void updateOrderStatus(UUID orderId, com.aquatrade.core.domain.enums.OrderStatus newStatus);
 }

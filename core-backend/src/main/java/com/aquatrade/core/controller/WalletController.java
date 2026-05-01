@@ -22,6 +22,26 @@ public class WalletController {
     @PostMapping("/deposit")
     public ResponseEntity<ApiResponse<String>> deposit(@RequestBody WalletDto.DepositRequest request) {
         walletService.deposit(request);
-        return ResponseEntity.ok(ApiResponse.success("Nạp tiền thành công"));
+        return ResponseEntity.ok(ApiResponse.success("Yêu cầu nạp tiền đã được gửi, vui lòng chờ Admin duyệt"));
+    }
+
+    @GetMapping("/admin/pending")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<java.util.List<com.aquatrade.core.dto.WalletDto.TransactionDto>>> getPendingDeposits() {
+        return ResponseEntity.ok(ApiResponse.success(walletService.getAllPendingDeposits()));
+    }
+
+    @PostMapping("/admin/approve/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> approveDeposit(@PathVariable String id) {
+        walletService.approveDeposit(id);
+        return ResponseEntity.ok(ApiResponse.success("Đã duyệt nạp tiền thành công"));
+    }
+
+    @PostMapping("/admin/reject/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> rejectDeposit(@PathVariable String id) {
+        walletService.rejectDeposit(id);
+        return ResponseEntity.ok(ApiResponse.success("Đã từ chối nạp tiền"));
     }
 }

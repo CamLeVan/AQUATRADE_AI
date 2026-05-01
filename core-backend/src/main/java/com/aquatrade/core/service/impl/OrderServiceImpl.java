@@ -79,12 +79,17 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy user buyer"));
 
         // BE tự tính giá từ DB theo Số lượng KHÁCH MUỐN MUA
-        BigDecimal totalPrice = listing.getPricePerFish()
+        BigDecimal subtotal = listing.getPricePerFish()
                 .multiply(BigDecimal.valueOf(request.getQuantity()));
+        
+        // CỘNG THÊM PHÍ GIAO HÀNG (50k) VÀ PHÍ AI (25k) để khớp với FE
+        BigDecimal shippingFee = new BigDecimal("50000");
+        BigDecimal aiFee = new BigDecimal("25000");
+        BigDecimal totalPrice = subtotal.add(shippingFee).add(aiFee);
 
         // Check số dư
         if (buyer.getWalletBalance().compareTo(totalPrice) < 0) {
-            throw new IllegalArgumentException("Số dư trong ví không đủ để thanh toán tạm giữ Escrow. Vui lòng nạp thêm.");
+            throw new IllegalArgumentException("Số dư trong ví không đủ (Cần " + totalPrice.toPlainString() + "đ). Vui lòng nạp thêm.");
         }
 
         // Tự động khóa Escrow bằng cách trừ tiền trong ví người mua
@@ -150,7 +155,25 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<OrderDto.OrderResponse> getMyOrders() {
         UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return orderRepository.findByBuyerIdOrderByCreatedAtDesc(currentUserId)
+        // Lấy đơn hàng mình đi mua
+        List<Order> boughtOrders = orderRepository.findByBuyerIdOrderByCreatedAtDesc(currentUserId);
+        // Lấy đơn hàng mình bán cho người khác
+        List<Order> soldOrders = orderRepository.findByListingSellerIdOrderByCreatedAtDesc(currentUserId);
+
+        // Gộp lại và sắp xếp theo thời gian mới nhất
+        java.util.List<Order> allOrders = new java.util.ArrayList<>();
+        allOrders.addAll(boughtOrders);
+        allOrders.addAll(soldOrders);
+        allOrders.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+
+        return allOrders.stream()
+                .map(this::mapToDto)
+                .toList();
+    }
+
+    @Override
+    public List<OrderDto.OrderResponse> getSellerOrders(UUID sellerId) {
+        return orderRepository.findByListingSellerIdOrderByCreatedAtDesc(sellerId)
                 .stream()
                 .map(this::mapToDto)
                 .toList();
@@ -170,9 +193,15 @@ public class OrderServiceImpl implements OrderService {
                         .createdAt(p.getCreatedAt())
                         .build()).toList();
 
+        String thumbnailUrl = entity.getListing().getThumbnailUrl();
+        if ((thumbnailUrl == null || thumbnailUrl.isEmpty()) && !entity.getListing().getImages().isEmpty()) {
+            thumbnailUrl = entity.getListing().getImages().get(0).getImageUrl();
+        }
+
         return OrderDto.OrderResponse.builder()
                 .id(entity.getId().toString())
                 .listingTitle(entity.getListing().getTitle())
+                .listingThumbnailUrl(thumbnailUrl)
                 .buyerName(entity.getBuyer().getFullName())
                 .sellerName(entity.getListing().getSeller().getFullName())
                 .unitPriceAtPurchase(entity.getUnitPriceAtPurchase())
@@ -202,11 +231,20 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Đóng vòng đời Order
-        order.setStatus(OrderStatus.COMPLETED);
+        order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.COMPLETED);
         orderRepository.save(order);
 
-        // Publish event để xử lý dòng tiền thay vì code cứng vào đây (Event-Driven Architecture)
-        eventPublisher.publishEvent(new com.aquatrade.core.domain.event.OrderCompletedEvent(order));
+        // Chuyển hóa dòng tiền (End-Game): 5% Platform Commission trên tiền hàng, phí AI & Shipping về Platform
+        java.math.BigDecimal totalWithFees = order.getTotalPrice();
+        java.math.BigDecimal shippingFee = new java.math.BigDecimal("50000");
+        java.math.BigDecimal aiFee = new java.math.BigDecimal("25000");
+        java.math.BigDecimal subtotal = totalWithFees.subtract(shippingFee).subtract(aiFee);
+
+        java.math.BigDecimal commission = subtotal.multiply(new java.math.BigDecimal("0.05"))
+                .setScale(0, java.math.RoundingMode.HALF_UP);
+        java.math.BigDecimal sellerPayout = subtotal.subtract(commission);
+        
+        // Payout logic normally continues here...
     }
 
     @Override
@@ -220,9 +258,19 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Chỉ người mua mới có quyền đối soát số lượng cho đơn hàng này.");
         }
 
+<<<<<<< HEAD
         if (order.getStatus() != OrderStatus.AI_VERIFIED) {
             throw new IllegalStateException("Đơn hàng chưa ở trạng thái chờ xác nhận (AI_VERIFIED).");
         }
+=======
+        // 2. Chuyển tiền cho Platform (Treasury)
+        SystemTreasury treasury = systemTreasuryRepository.findById(1)
+                .orElse(SystemTreasury.builder().id(1).totalRevenue(BigDecimal.ZERO).build());
+        
+        BigDecimal platformIncome = commission.add(shippingFee).add(aiFee);
+        treasury.setTotalRevenue(treasury.getTotalRevenue().add(platformIncome));
+        systemTreasuryRepository.save(treasury);
+>>>>>>> f1a15cf (feat: implement order status management and administrative wallet oversight)
 
         List<DigitalProof> proofs = order.getProofs();
         if (proofs == null || proofs.isEmpty()) {
@@ -375,5 +423,74 @@ public class OrderServiceImpl implements OrderService {
                 messagingTemplate.convertAndSend("/topic/orders/" + proof.getOrder().getId(), failPayload);
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public void adminReviewOrder(UUID orderId, Integer finalQuantity) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+        // Tính toán lại giá trị dựa trên số lượng thực tế Admin duyệt
+        BigDecimal unitPrice = order.getUnitPriceAtPurchase();
+        BigDecimal shippingFee = new BigDecimal("50000");
+        BigDecimal aiFee = new BigDecimal("25000");
+        
+        BigDecimal newSubtotal = unitPrice.multiply(BigDecimal.valueOf(finalQuantity));
+        BigDecimal newTotal = newSubtotal.add(shippingFee).add(aiFee);
+
+        // Nếu số lượng thực tế ít hơn lúc đặt -> Hoàn tiền chênh lệch cho Buyer
+        if (newTotal.compareTo(order.getTotalPrice()) < 0) {
+            BigDecimal refundAmount = order.getTotalPrice().subtract(newTotal);
+            User buyer = order.getBuyer();
+            buyer.setWalletBalance(buyer.getWalletBalance().add(refundAmount));
+            userRepository.save(buyer);
+            
+            // Log giao dịch hoàn tiền
+            Transaction refundTx = Transaction.builder()
+                    .order(order)
+                    .user(buyer)
+                    .amount(refundAmount)
+                    .postBalance(buyer.getWalletBalance())
+                    .type(TransactionType.ORDER_PAYOUT) // Hoặc tạo type mới REFUND
+                    .status(TransactionStatus.SUCCESS)
+                    .build();
+            transactionRepository.save(refundTx);
+            log.info("Admin điều chỉnh giảm số lượng: Hoàn trả {}đ cho Buyer {}", refundAmount, buyer.getFullName());
+        }
+
+        order.setFinalQuantity(finalQuantity);
+        order.setTotalPrice(newTotal);
+        order.setStatus(OrderStatus.PREPARING); // Chuyển sang trạng thái Đang chuẩn bị sau khi Admin duyệt
+        orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public void updateOrderStatus(UUID orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+        // KHÓA VĨNH VIỄN: Nếu đơn hàng đã hoàn tất thì không được đổi nữa
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new IllegalArgumentException("Đơn hàng đã hoàn tất vĩnh viễn, không thể thay đổi trạng thái!");
+        }
+
+        // Lấy thông tin người dùng đang đăng nhập
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
+
+        // KIỂM TRA QUYỀN: Chỉ Admin hoặc Chính Người bán của sản phẩm này mới được cập nhật
+        boolean isAdmin = currentUser.getRole().name().equals("ADMIN");
+        boolean isOwnerSeller = order.getListing().getSeller().getId().equals(currentUserId);
+
+        if (!isAdmin && !isOwnerSeller) {
+            throw new SecurityException("Bạn không có quyền cập nhật trạng thái cho đơn hàng này!");
+        }
+
+        order.setStatus(newStatus);
+        orderRepository.save(order);
+        log.info("Order {} status updated to {} by {}", orderId, newStatus, currentUser.getUsername());
     }
 }

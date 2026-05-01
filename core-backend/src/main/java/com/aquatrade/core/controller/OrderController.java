@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,26 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderService orderService;
+    private final com.aquatrade.core.repository.OrderRepository orderRepository;
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<OrderDto.OrderResponse>>> getAllOrders() {
+        return ResponseEntity.ok(ApiResponse.success(
+                orderRepository.findAll().stream()
+                        .map(order -> OrderDto.OrderResponse.builder()
+                                .id(order.getId().toString())
+                                .listingTitle(order.getListing().getTitle())
+                                .buyerName(order.getBuyer().getFullName())
+                                .sellerName(order.getListing().getSeller().getFullName())
+                                .finalQuantity(order.getFinalQuantity())
+                                .totalPrice(order.getTotalPrice())
+                                .status(order.getStatus())
+                                .createdAt(order.getCreatedAt())
+                                .build())
+                        .toList()
+        ));
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
@@ -34,7 +55,19 @@ public class OrderController {
 
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<OrderDto.OrderResponse>>> getMyOrders() {
-        return ResponseEntity.ok(ApiResponse.success(orderService.getMyOrders()));
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<OrderDto.OrderResponse> orders = orderService.getMyOrders();
+        System.out.println(">>> [DEBUG] Fetching orders for Buyer ID: " + currentUserId + " | Count: " + orders.size());
+        return ResponseEntity.ok(ApiResponse.success(orders));
+    }
+
+    @GetMapping("/seller")
+    @PreAuthorize("hasRole('SELLER')")
+    public ResponseEntity<ApiResponse<List<OrderDto.OrderResponse>>> getSellerOrders() {
+        UUID sellerId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<OrderDto.OrderResponse> orders = orderService.getSellerOrders(sellerId);
+        System.out.println(">>> [DEBUG] Fetching orders for Seller ID: " + sellerId + " | Count: " + orders.size());
+        return ResponseEntity.ok(ApiResponse.success(orders));
     }
 
     @PostMapping("/{id}/confirm")
@@ -58,5 +91,23 @@ public class OrderController {
     public ResponseEntity<ApiResponse<String>> completeOrder(@PathVariable String id) {
         orderService.completeOrder(UUID.fromString(id));
         return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã hoàn thành. Tiền đã được chuyển vào ví người bán."));
+    }
+
+    @PostMapping("/{id}/review")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> adminReviewOrder(
+            @PathVariable String id,
+            @RequestParam Integer finalQuantity) {
+        orderService.adminReviewOrder(UUID.fromString(id), finalQuantity);
+        return ResponseEntity.ok(ApiResponse.success("Phê duyệt số lượng đơn hàng thành công. Dòng tiền đã được điều chỉnh."));
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> updateOrderStatus(
+            @PathVariable String id,
+            @RequestParam com.aquatrade.core.domain.enums.OrderStatus status) {
+        orderService.updateOrderStatus(UUID.fromString(id), status);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công."));
     }
 }
