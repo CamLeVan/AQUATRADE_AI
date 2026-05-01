@@ -46,6 +46,27 @@ public class CMSPostServiceImpl {
         return mapToDto(post);
     }
 
+    @Transactional
+    public CMSPostDto updatePost(UUID id, CMSPostDto dto) {
+        CMSPost post = cmsPostRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy bài viết"));
+        
+        post.setTitle(dto.getTitle());
+        post.setContent(dto.getContent());
+        post.setCategory(dto.getCategory());
+        post.setStatus(dto.getStatus());
+        if (dto.getFeaturedImageUrl() != null) {
+            post.setFeaturedImageUrl(dto.getFeaturedImageUrl());
+        }
+        
+        return mapToDto(cmsPostRepository.save(post));
+    }
+
+    @Transactional
+    public void deletePost(UUID id) {
+        cmsPostRepository.deleteById(id);
+    }
+
     private CMSPostDto mapToDto(CMSPost entity) {
         return CMSPostDto.builder()
                 .id(entity.getId().toString())

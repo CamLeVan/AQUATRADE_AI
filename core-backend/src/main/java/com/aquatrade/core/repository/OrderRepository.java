@@ -14,6 +14,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByBuyerIdOrderByCreatedAtDesc(UUID buyerId);
 
+    List<Order> findByListingSellerIdOrderByCreatedAtDesc(UUID sellerId);
+
     long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 
     long countByListingSellerId(UUID sellerId);

@@ -18,5 +18,6 @@ public class UserDto {
     private String companyName;
     private Role role;
     private UserStatus status;
+    private java.math.BigDecimal walletBalance;
     private LocalDateTime createdAt;
 }
