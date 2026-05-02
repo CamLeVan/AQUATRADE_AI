@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AquaTrade AI Result Payload (Sprint 6, BE develop)",
+  "description": "Schema khớp `AIDetectionDto.DonePayload` Java BE develop. AI POST về URL động: /api/v1/internal/orders/{orderId}/proofs/{proofId}/ai-result với header X-Internal-Secret.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["status", "orderId", "createdAt"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["DONE", "FAILED"]
+    },
+    "orderId": {
+      "type": "string",
+      "description": "UUID Order"
+    },
+    "errorMessage": {
+      "type": ["string", "null"],
+      "description": "Bắt buộc khi status=FAILED"
+    },
+    "aiFishCount": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "healthScore": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "qualityStatus": {
+      "type": ["string", "null"],
+      "enum": ["NORMAL", "LOW", null]
+    },
+    "aiImageUrl": {
+      "type": ["string", "null"],
+      "description": "URL Cloudinary của best-frame image (public CDN)."
+    },
+    "proofHash": {
+      "type": ["string", "null"],
+      "description": "SHA-256 hex của video gốc AI tải về (audit/dispute)."
+    },
+    "averageSize": {
+      "type": ["number", "null"]
+    },
+    "impuritiesCount": {
+      "type": ["integer", "null"]
+    },
+    "colorUniformity": {
+      "type": ["integer", "null"]
+    },
+    "aiNotes": {
+      "type": ["string", "null"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"status": {"const": "DONE"}}
+      },
+      "then": {
+        "required": ["aiFishCount", "healthScore", "qualityStatus", "aiImageUrl", "proofHash"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"const": "FAILED"}}
+      },
+      "then": {
+        "required": ["errorMessage"]
+      }
+    }
+  ]
+}

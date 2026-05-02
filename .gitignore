@@ -31,3 +31,23 @@ Thumbs.db
 *.db
 *.db-journal
 *.sqlite
+
+# --- Python / AI service ---
+ai-service/.venv/
+ai-service/.history/
+ai-service/Ultralytics/
+ai-service/__pycache__/
+ai-service/**/__pycache__/
+ai-service/*.pyc
+ai-service/models/
+ai-service/test_videos/
+ai-service/data/incoming/
+ai-service/data/outputs/*.mp4
+ai-service/data/outputs/*.jpg
+ai-service/data/outputs/*.png
+ai-service/data/outputs/result_*.json
+ai-service/data/runs/
+ai-service/data/datasets/
+ai-service/fish_counter_debug.log
+ai-service/fish_report.csv
+ai-service/counting_history.json
