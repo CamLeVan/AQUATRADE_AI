@@ -10,7 +10,6 @@ import os
 
 # Import các module từ cùng package core
 # Sử dụng relative import vì chúng nằm cùng thư mục src/core
-from .kalman_filter import KalmanFilter
 from .tracker import SimpleTracker
 from .reid import SimpleReID
 
@@ -146,7 +145,6 @@ class FishCounter:
             self.start_time = time.time()
             self.final_count = 0
             self.unique_fish_count = 0
-            self.track_to_fish_map = {}
             self.track_to_fish_map = {}
             self.count_buffer.clear()
             self.biomass_buffer.clear()
@@ -464,10 +462,10 @@ class FishCounter:
                     
                     # NMSBoxes của OpenCV
                     nms_indices = cv2.dnn.NMSBoxes(
-                        boxes.tolist(), 
-                        scores.tolist(), 
-                        score_threshold=0.45, 
-                        nms_threshold=1  # Ngưỡng 0.8: Chấp nhận chồng lấn cao (cá bơi đàn) nhưng loại bỏ box trùng lặp (double detection)
+                        boxes.tolist(),
+                        scores.tolist(),
+                        score_threshold=0.45,
+                        nms_threshold=0.7,
                     )
                     
                     if isinstance(nms_indices, tuple): nms_indices = nms_indices[0]
@@ -742,17 +740,11 @@ class FishCounter:
             return None
 
     def calculate_biomass(self, area, class_id):
-        try:
-            params = self.biomass_params.get(class_id, self.biomass_params.get(0))
-            if params:
-                a = params['a']
-                b = params['b']
-                weight = a * (area ** b)
-                return weight
-            return 0
-        except Exception as e:
-            logging.error(f"Error calculating biomass: {e}")
-            return 0
+        # Delegate sang biomass module để giữ DRY giữa FishCounter (GUI)
+        # và pipeline (async worker). self.biomass_params vẫn giữ để các
+        # test/cấu hình cũ override được per-instance.
+        from .biomass import calculate_weight
+        return calculate_weight(area, class_id, self.biomass_params)
 
     def is_counting_finished(self):
         return not self.is_counting
