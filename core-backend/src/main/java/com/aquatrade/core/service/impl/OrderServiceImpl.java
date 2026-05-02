@@ -234,17 +234,49 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.COMPLETED);
         orderRepository.save(order);
 
-        // Chuyển hóa dòng tiền (End-Game): 5% Platform Commission trên tiền hàng, phí AI & Shipping về Platform
-        java.math.BigDecimal totalWithFees = order.getTotalPrice();
-        java.math.BigDecimal shippingFee = new java.math.BigDecimal("50000");
-        java.math.BigDecimal aiFee = new java.math.BigDecimal("25000");
-        java.math.BigDecimal subtotal = totalWithFees.subtract(shippingFee).subtract(aiFee);
+        eventPublisher.publishEvent(new com.aquatrade.core.domain.event.OrderCompletedEvent(order));
+    }
 
-        java.math.BigDecimal commission = subtotal.multiply(new java.math.BigDecimal("0.05"))
-                .setScale(0, java.math.RoundingMode.HALF_UP);
-        java.math.BigDecimal sellerPayout = subtotal.subtract(commission);
-        
-        // Payout logic normally continues here...
+    @Override
+    @Transactional
+    public void cancelOrder(UUID id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + id));
+
+        // Kiểm tra trạng thái: Chỉ những đơn đã khóa tiền hoặc đang tranh chấp mới cần hoàn tiền
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("Đơn hàng không thể hủy trong trạng thái hiện tại.");
+        }
+
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // Cho phép Buyer hủy nếu chưa xác nhận (hoặc sau này thêm logic Admin)
+        if (!order.getBuyer().getId().equals(currentUserId)) {
+            // Tạm thời chỉ cho phép Buyer thao tác, Admin sẽ có API riêng
+            throw new IllegalArgumentException("Chỉ người mua (hoặc Admin) mới được quyền hủy đơn.");
+        }
+
+        // Hoàn tiền từ kho Escrow về lại ví Buyer
+        User buyer = order.getBuyer();
+        BigDecimal refundAmount = order.getTotalPrice();
+        buyer.setWalletBalance(buyer.getWalletBalance().add(refundAmount));
+        userRepository.save(buyer);
+
+        // Ghi lại lịch sử (Log) - Hoàn tiền
+        Transaction refundTx = Transaction.builder()
+                .order(order)
+                .user(buyer)
+                .amount(refundAmount)
+                .postBalance(buyer.getWalletBalance())
+                .type(TransactionType.REFUND)
+                .status(TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(refundTx);
+
+        // Đóng vòng đời Order với trạng thái CANCELLED
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        log.info("Order {} cancelled. Refunded {} to Buyer {}.", order.getId(), refundAmount, buyer.getId());
     }
 
     @Override
@@ -258,19 +290,9 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("Chỉ người mua mới có quyền đối soát số lượng cho đơn hàng này.");
         }
 
-<<<<<<< HEAD
         if (order.getStatus() != OrderStatus.AI_VERIFIED) {
             throw new IllegalStateException("Đơn hàng chưa ở trạng thái chờ xác nhận (AI_VERIFIED).");
         }
-=======
-        // 2. Chuyển tiền cho Platform (Treasury)
-        SystemTreasury treasury = systemTreasuryRepository.findById(1)
-                .orElse(SystemTreasury.builder().id(1).totalRevenue(BigDecimal.ZERO).build());
-        
-        BigDecimal platformIncome = commission.add(shippingFee).add(aiFee);
-        treasury.setTotalRevenue(treasury.getTotalRevenue().add(platformIncome));
-        systemTreasuryRepository.save(treasury);
->>>>>>> f1a15cf (feat: implement order status management and administrative wallet oversight)
 
         List<DigitalProof> proofs = order.getProofs();
         if (proofs == null || proofs.isEmpty()) {

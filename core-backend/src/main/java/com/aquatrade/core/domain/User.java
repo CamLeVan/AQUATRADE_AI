@@ -18,8 +18,7 @@ import com.aquatrade.core.domain.enums.UserStatus;
 @Builder
 public class User extends BaseObject {
 
-    // === Thông tin định danh & Xác thực ===
-    // [THỐNG NHẤT FE-BE] Đăng nhập bằng EMAIL (không phải username)
+
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
