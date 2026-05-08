@@ -42,15 +42,26 @@ const Registration = () => {
             if (response.data.status === 'success') {
                 const { token, refreshToken, role: userRole, userId } = response.data.data;
                 
-                // Tự động đăng nhập luôn sau khi đăng ký thành công
+                // Lưu token và thông tin người dùng đồng bộ để Sidebar và các component khác nhận diện đúng
                 localStorage.setItem('accessToken', token);
                 localStorage.setItem('refreshToken', refreshToken);
-                localStorage.setItem('userRole', userRole);
+                localStorage.setItem('user', JSON.stringify({
+                    userId: userId,
+                    role: userRole,
+                    fullName: fullName || (userRole === 'ADMIN' ? 'System Admin' : 'Aqua Seller')
+                }));
+                localStorage.setItem('userRole', userRole); 
                 localStorage.setItem('userId', userId);
 
                 setSuccessMsg('Đăng ký thành công! Đang chuyển hướng...');
+                
                 setTimeout(() => {
-                    navigate('/'); // Trở về trang chủ (Dashboard)
+                    // Điều hướng thông minh dựa trên vai trò
+                    if (userRole === 'SELLER' || userRole === 'ADMIN') {
+                        navigate('/admin');
+                    } else {
+                        navigate('/');
+                    }
                 }, 1500);
             } else {
                 setError(response.data.message || 'Đăng ký thất bại.');

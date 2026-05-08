@@ -1,9 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import Footer from '../../components/layout/Footer';
+import api from '../../services/api';
 
 const Settings = () => {
+    const [user, setUser] = useState(null);
+    const [wallet, setWallet] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const userRes = await api.get('/users/me');
+                if (userRes.data.status === 'success') {
+                    setUser(userRes.data.data);
+                }
+
+                const walletRes = await api.get('/users/me/wallet');
+                if (walletRes.data.status === 'success') {
+                    setWallet(walletRes.data.data);
+                }
+            } catch (error) {
+                console.error("Lỗi khi tải thông tin người dùng:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="bg-surface text-on-surface font-display min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="bg-surface text-on-surface font-display min-h-screen flex overflow-hidden antialiased">
             <Sidebar />
@@ -30,8 +65,12 @@ const Settings = () => {
                             <button className="w-10 h-10 rounded-full flex items-center justify-center text-slate-600 hover:bg-cyan-50 transition-colors">
                                 <span className="material-symbols-outlined font-icon">settings</span>
                             </button>
-                            <div className="ml-2 w-8 h-8 rounded-full overflow-hidden border border-primary/20">
-                                <img alt="User profile avatar" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFIxm6GN6105AAjEclvwhjE8kEA5gU5_hiwf_wJjfMd7DN9NoMbsNFemgLdc9LnshIGGo-gH9ih7uwwWiSa1fA5fkaB06t5JHUsqI5BaXa_v_4Hi3pHJLiGgsVDlsG0HHFN2JTIaP69GjBvpuGuN3AC0jsR0kvnKKZK3SVVh9VmiEI6p4ZVaPVhYBmnN9axLb6kIbVSfkGVYobsdLv7KMFe_1GpQ1dBrZkSZvrvtjk2c_sszK6EBPxohlAu-O-11eY8nehTe6c8JUx" />
+                            <div className="ml-2 w-8 h-8 rounded-full overflow-hidden border border-primary/20 bg-slate-100 flex items-center justify-center">
+                                {user?.avatarUrl ? (
+                                    <img alt="User profile avatar" className="w-full h-full object-cover" src={user.avatarUrl} />
+                                ) : (
+                                    <span className="material-symbols-outlined text-slate-400 text-lg">person</span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -53,15 +92,19 @@ const Settings = () => {
                                 {/* Profile Card */}
                                 <div className="md:col-span-1 bg-surface-container-lowest rounded-xl shadow-sm border border-outline p-8 flex flex-col items-center text-center">
                                     <div className="relative mb-6">
-                                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface p-1">
-                                            <img alt="User Avatar" className="w-full h-full object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGDqj9EBeQWN4VGW9qxYCnKTdE9BNx8tpKDXRhK5mCVciulSeEALTPxKsdqD3UrhTZ0DX1vcUeAMyK83umR7NRB-8bstHB95qa_X87jx8x8Re1sZDivaDZISNGSLuFN17_XRSaQfz7HbffkLah_uDLz-39sl41b3K7SRJP1DSd0DYtgOUyFDPfbOW7-46brsWdB_RE6aVKRYZ7V6dkraHVD91aoHFEDEN7q3o8l1HdJNb3Zs89MpNywmaMChCpbseZrKeyCXKmgNlF" />
+                                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface p-1 bg-slate-50 flex items-center justify-center">
+                                            {user?.avatarUrl ? (
+                                                <img alt="User Avatar" className="w-full h-full object-cover rounded-full" src={user.avatarUrl} />
+                                            ) : (
+                                                <span className="material-symbols-outlined text-slate-200 text-6xl">person</span>
+                                            )}
                                         </div>
                                         <button className="absolute bottom-1 right-1 bg-primary text-on-primary w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white active:scale-90 transition-transform">
                                             <span className="material-symbols-outlined text-sm font-icon">photo_camera</span>
                                         </button>
                                     </div>
-                                    <h4 className="text-xl font-bold text-slate-800">Ly Thanh Long</h4>
-                                    <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mt-1">Quản trị viên Logistics</p>
+                                    <h4 className="text-xl font-bold text-slate-800">{user?.fullName || 'Chưa cập nhật'}</h4>
+                                    <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mt-1">{user?.role === 'ADMIN' ? 'Quản trị viên hệ thống' : user?.role === 'SELLER' ? 'Đối tác cung ứng' : 'Khách hàng thành viên'}</p>
                                     <div className="mt-6 w-full pt-6 border-t border-primary/5 flex flex-col gap-3">
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-slate-400 font-medium">Status</span>
@@ -72,7 +115,7 @@ const Settings = () => {
                                         </div>
                                         <div className="flex justify-between items-center text-xs">
                                             <span className="text-slate-400 font-medium">Member Since</span>
-                                            <span className="text-slate-700 font-bold">Jan 2026</span>
+                                            <span className="text-slate-700 font-bold">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }) : 'Jan 2026'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -81,22 +124,21 @@ const Settings = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-8 gap-x-12">
                                         <div>
                                             <label className="text-[10px] font-bold tracking-widest uppercase text-slate-400 block mb-2">Tên người dùng</label>
-                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent focus-within:border-primary transition-colors">ThanhLong.Aqua</p>
+                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent focus-within:border-primary transition-colors">{user?.username}</p>
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-bold tracking-widest uppercase text-slate-400 block mb-2">Email doanh nghiệp</label>
-                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent">longly@aquatrade.ai</p>
+                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent">{user?.email}</p>
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-bold tracking-widest uppercase text-slate-400 block mb-2">Vai trò</label>
                                             <div className="flex gap-2">
-                                                <span className="px-3 py-1 bg-primary/10 text-on-primary-container text-[11px] font-bold rounded-full border border-primary/20">Người bán</span>
-                                                <span className="px-3 py-1 bg-secondary-container text-on-secondary-container text-[11px] font-bold rounded-full border border-slate-200">Nhà cung cấp</span>
+                                                <span className="px-3 py-1 bg-primary/10 text-on-primary-container text-[11px] font-bold rounded-full border border-primary/20">{user?.role}</span>
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-bold tracking-widest uppercase text-slate-400 block mb-2">Số điện thoại</label>
-                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent">+84 901 234 567</p>
+                                            <p className="text-sm font-semibold text-slate-800 bg-surface-container py-3 px-4 rounded-lg border border-transparent">{user?.phoneNumber || 'Chưa cập nhật'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -249,10 +291,10 @@ const Settings = () => {
                                     </div>
                                     <div className="mb-6">
                                         <p className="text-[10px] font-bold tracking-widest uppercase text-slate-400 opacity-70">Balance</p>
-                                        <h4 className="text-2xl font-bold tracking-tight">$42,850.00</h4>
+                                        <h4 className="text-2xl font-bold tracking-tight">{(wallet?.balance || 0).toLocaleString()}đ</h4>
                                     </div>
                                     <div className="flex justify-between items-center relative z-10">
-                                        <p className="text-[15px] font-bold tracking-widest">THANH LONG LY</p>
+                                        <p className="text-[15px] font-bold tracking-widest uppercase">{user?.fullName}</p>
                                         <span className="px-2 py-0.5 rounded bg-primary text-on-primary text-[8px] font-black uppercase">DEFAULT</span>
                                     </div>
                                 </div>

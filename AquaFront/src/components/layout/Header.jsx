@@ -4,6 +4,7 @@ import api from '../../services/api';
 const Header = () => {
     const [userName, setUserName] = useState('Khách');
     const [userRole, setUserRole] = useState('Visitor');
+    const [avatarUrl, setAvatarUrl] = useState(null);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -13,6 +14,7 @@ const Header = () => {
                     if (response.data.status === 'success') {
                         setUserName(response.data.data.fullName);
                         setUserRole(response.data.data.role);
+                        setAvatarUrl(response.data.data.avatarUrl);
                     }
                 } catch (error) {
                     console.error("Failed to fetch user profile", error);
@@ -50,7 +52,13 @@ const Header = () => {
                         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{userName}</p>
                         <p className="text-[10px] text-slate-400 uppercase tracking-widest">{userRole}</p>
                     </div>
-                    <img alt="User Avatar" className="w-10 h-10 rounded-full border-2 border-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtWBEoX1WKeFB-bsE4NBbd1gaWtfcmFhh9DB1WZQmjJTVTdRCcjhHilRyeeXrqM2gYcLNq7U7mwHlqLLm9fBNm0DJ_QWgG2jhtG6TbV56vkrGYhBk523kAfh3EIOIXRV3ccc6sFgVQ65al1VkVWC7OvoVhjwEeuCfi0TJQ8Ot-LDeMdPS2ehH6m04cnV5CGD-9D4v8V64F0j_-Xy-X9q9_ws6YvT5lYBV_yccTRaXdXcJqtK6bJGw0JZd4D4WQsCpat1bD7be5SaEB"/>
+                    <div className="w-10 h-10 rounded-full border-2 border-primary/20 overflow-hidden bg-slate-100 flex items-center justify-center">
+                        {avatarUrl ? (
+                            <img alt="User Avatar" className="w-full h-full object-cover" src={avatarUrl} />
+                        ) : (
+                            <span className="material-symbols-outlined text-slate-400">person</span>
+                        )}
+                    </div>
                 </div>
             </div>
         </header>

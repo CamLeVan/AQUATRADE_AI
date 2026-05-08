@@ -4,7 +4,7 @@ const Footer = () => {
     return (
         <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-16 pb-8 px-8 mt-12">
             <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-                
+
                 <div className="space-y-6">
                     <div className="flex items-center">
                         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
@@ -38,9 +38,9 @@ const Footer = () => {
                 <div className="space-y-6">
                     <h4 className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">Contact</h4>
                     <div className="space-y-4">
-                        <a className="flex items-center text-slate-500 dark:text-slate-400 hover:text-primary transition-colors text-sm" href="mailto:support@aquatrade.ai">
+                        <a className="flex items-center text-slate-500 dark:text-slate-400 hover:text-primary transition-colors text-sm" href="mailto:longthanhnct@gmail.com">
                             <span className="material-icons-outlined text-sm mr-2">email</span>
-                            support@aquatrade.ai
+                            longthanhnct@gmail.com
                         </a>
                         <div className="flex items-center space-x-4 pt-2">
                             <a className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:border-primary hover:text-primary transition-all" href="#">
