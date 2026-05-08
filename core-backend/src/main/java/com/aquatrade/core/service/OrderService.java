@@ -13,7 +13,11 @@ public interface OrderService {
     void startAiAnalysis(UUID id, String videoUrl, String batchName);
     List<OrderDto.OrderResponse> getSellerOrders(UUID sellerId);
     void completeOrder(UUID id);
+    void disputeOrder(UUID orderId, String reason);
+    void respondToDispute(UUID orderId, String response);
+    void refundOrder(UUID orderId);
     void adminReviewOrder(UUID orderId, Integer finalQuantity);
     void updateOrderStatus(UUID orderId, com.aquatrade.core.domain.enums.OrderStatus newStatus);
+    void approvePayout(UUID orderId);
     void cancelOrder(UUID id);
 }

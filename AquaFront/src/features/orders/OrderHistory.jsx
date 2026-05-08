@@ -10,6 +10,8 @@ const OrderHistory = () => {
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showDisputeModal, setShowDisputeModal] = useState(false);
+    const [disputeReason, setDisputeReason] = useState('');
 
     const handleCompleteOrder = async (orderId) => {
         const confirmed = await notify.confirm(
@@ -17,14 +19,33 @@ const OrderHistory = () => {
             'Bạn xác nhận đã nhận được hàng và cá giống đúng chất lượng? Hành động này sẽ chuyển tiền cho người bán.',
             'question'
         );
-        
+
         if (!confirmed) return;
-        
+
         try {
             const response = await api.post(`/orders/${orderId}/complete`);
             if (response.data.status === 'success') {
                 notify.success('Xác nhận hoàn tất đơn hàng thành công!');
                 fetchData(); // Load lại dữ liệu
+            }
+        } catch (error) {
+            notify.error(error.response?.data?.message || 'Có lỗi xảy ra');
+        }
+    };
+
+    const handleDisputeOrder = async () => {
+        if (!disputeReason.trim()) {
+            notify.error('Vui lòng nhập lý do khiếu nại');
+            return;
+        }
+
+        try {
+            const response = await api.post(`/orders/${selectedOrder.id}/dispute?reason=${encodeURIComponent(disputeReason)}`);
+            if (response.data.status === 'success') {
+                notify.success('Đã gửi đơn khiếu nại!');
+                setShowDisputeModal(false);
+                setDisputeReason('');
+                fetchData();
             }
         } catch (error) {
             notify.error(error.response?.data?.message || 'Có lỗi xảy ra');
@@ -39,7 +60,7 @@ const OrderHistory = () => {
             setUser(currentUser);
 
             const ordersRes = await api.get('/orders/my');
-            
+
             if (ordersRes.data.status === 'success') {
                 setOrders(ordersRes.data.data);
             }
@@ -77,7 +98,7 @@ const OrderHistory = () => {
                     <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-900/20 border-b border-slate-200 dark:border-slate-800">
                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                             <div className="relative w-full md:w-96">
-                                <input className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm" placeholder="Tìm kiếm mã đơn, sản phẩm..." type="text"/>
+                                <input className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-sm" placeholder="Tìm kiếm mã đơn, sản phẩm..." type="text" />
                             </div>
                             <div className="flex gap-3 w-full md:w-auto">
                                 <select className="px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl outline-none text-sm font-bold">
@@ -95,9 +116,9 @@ const OrderHistory = () => {
                                 <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col md:flex-row gap-5 hover:shadow-lg transition-all group">
                                     {/* Product Visual - Smaller & Compact */}
                                     <div className="relative w-full md:w-40 h-28 flex-shrink-0 rounded-xl overflow-hidden shadow-sm">
-                                        <img 
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                                            src={order.listingThumbnailUrl || "https://muoibienseafood.com/wp-content/uploads/2024/11/Phan-biet-tom-the-va-tom-su.jpg.webp"} 
+                                        <img
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            src={order.listingThumbnailUrl || "https://muoibienseafood.com/wp-content/uploads/2024/11/Phan-biet-tom-the-va-tom-su.jpg.webp"}
                                             alt={order.listingTitle}
                                         />
                                         <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur px-2 py-0.5 rounded-full text-[8px] text-cyan-600 font-black uppercase">
@@ -105,23 +126,27 @@ const OrderHistory = () => {
                                             AI
                                         </div>
                                     </div>
-                                    
+
                                     {/* Order Content - Tighter layout */}
                                     <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-4 items-center">
                                         <div className="space-y-1">
                                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Đơn hàng</p>
                                             <p className="text-sm font-bold text-slate-900">#AQ-{order.id.slice(-6).toUpperCase()}</p>
-                                            <div className={`w-fit px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tight border ${
-                                                order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                            <div className={`w-fit px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tight border ${order.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                 order.status === 'SHIPPING' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                order.status === 'PREPARING' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                'bg-cyan-50 text-cyan-600 border-cyan-100'}`}>
-                                                {order.status === 'ESCROW_LOCKED' ? 'Đã xác nhận' : 
-                                                 order.status === 'PREPARING' ? 'Đang chuẩn bị' :
-                                                 order.status === 'SHIPPING' ? 'Đang giao hàng' :
-                                                 order.status === 'DELIVERED' ? 'Đã giao tới' :
-                                                 order.status === 'COMPLETED' ? 'Hoàn tất' : order.status}
-                                             </div>
+                                                    order.status === 'PREPARING' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                        order.status === 'DISPUTED' ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' :
+                                                            order.status === 'CANCELLED' ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                                                                'bg-cyan-50 text-cyan-600 border-cyan-100'}`}>
+                                                {order.status === 'ESCROW_LOCKED' ? 'Đã xác nhận' :
+                                                    order.status === 'PREPARING' ? 'Đang chuẩn bị' :
+                                                        order.status === 'SHIPPING' ? 'Đang giao hàng' :
+                                                            order.status === 'DELIVERED' ? 'Đã giao tới' :
+                                                                order.status === 'DISPUTED' ? 'Đang khiếu nại' :
+                                                                    order.status === 'CANCELLED' ? 'Đã hoàn tiền' :
+                                                                    order.status === 'READY_TO_PAYOUT' ? 'Chờ duyệt chi' :
+                                                                        order.status === 'COMPLETED' ? 'Hoàn tất' : order.status}
+                                            </div>
                                         </div>
 
                                         <div className="space-y-0.5">
@@ -145,18 +170,33 @@ const OrderHistory = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Quick Actions - Smaller buttons */}
                                     <div className="flex md:flex-col gap-2 justify-center lg:w-32 pt-4 md:pt-0 md:pl-5 border-t md:border-t-0 md:border-l border-slate-100">
-                                        {user?.role === 'BUYER' && order.status === 'ESCROW_LOCKED' && (
-                                            <button 
-                                                onClick={() => handleCompleteOrder(order.id)}
-                                                className="flex-1 bg-cyan-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all"
-                                            >
-                                                Nhận hàng
-                                            </button>
+                                        {user?.role === 'BUYER' && (['DELIVERED', 'READY_TO_PAYOUT', 'COMPLETED'].includes(order.status)) && (
+                                            <>
+                                                {order.status === 'DELIVERED' && (
+                                                    <button
+                                                        onClick={() => handleCompleteOrder(order.id)}
+                                                        className="flex-1 bg-cyan-500 text-white py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all"
+                                                    >
+                                                        Đã nhận hàng
+                                                    </button>
+                                                )}
+                                                {['DELIVERED', 'READY_TO_PAYOUT', 'COMPLETED'].includes(order.status) && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedOrder(order);
+                                                            setShowDisputeModal(true);
+                                                        }}
+                                                        className="flex-1 bg-rose-50 text-rose-600 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100"
+                                                    >
+                                                        Khiếu nại
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 setSelectedOrder(order);
                                                 setShowModal(true);
@@ -226,9 +266,9 @@ const OrderHistory = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-6">
                                     <div className="aspect-square rounded-3xl overflow-hidden border border-slate-100 bg-slate-50 relative group">
-                                        <img 
-                                            className="w-full h-full object-cover" 
-                                            src={selectedOrder.digitalProof?.aiImageUrl || selectedOrder.listingThumbnailUrl} 
+                                        <img
+                                            className="w-full h-full object-cover"
+                                            src={selectedOrder.digitalProof?.aiImageUrl || selectedOrder.listingThumbnailUrl}
                                             alt="AI Proof"
                                         />
                                         <div className="absolute top-4 left-4 bg-cyan-500 text-white px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-lg">
@@ -271,6 +311,51 @@ const OrderHistory = () => {
                                         Tải chứng chỉ (PDF)
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* DISPUTE MODAL */}
+            {showDisputeModal && selectedOrder && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowDisputeModal(false)}></div>
+                    <div className="relative bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Gửi Khiếu Nại</h2>
+                                    <p className="text-xs font-bold text-rose-500 uppercase tracking-widest">Đơn hàng #AQ-{selectedOrder.id.slice(-6).toUpperCase()}</p>
+                                </div>
+                                <button onClick={() => setShowDisputeModal(false)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-slate-500">close</span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
+                                    <p className="text-[11px] text-rose-700 font-bold leading-relaxed">
+                                        <span className="material-symbols-outlined text-xs align-middle mr-1">warning</span>
+                                        Lưu ý: Nếu khiếu nại được chấp nhận và thực hiện hoàn tiền, bạn sẽ bị trừ 10% giá trị đơn hàng (phí vận hành/phạt).
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lý do khiếu nại chi tiết</label>
+                                    <textarea
+                                        value={disputeReason}
+                                        onChange={(e) => setDisputeReason(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-rose-500 outline-none transition-all h-32 resize-none"
+                                        placeholder="Mô tả vấn đề bạn gặp phải (ví dụ: Cá chết nhiều, không đúng chủng loại...)"
+                                    ></textarea>
+                                </div>
+
+                                <button
+                                    onClick={handleDisputeOrder}
+                                    className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-xl shadow-rose-500/20"
+                                >
+                                    Gửi yêu cầu khiếu nại
+                                </button>
                             </div>
                         </div>
                     </div>

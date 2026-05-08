@@ -87,10 +87,17 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('BUYER', 'SELLER')")
+    @PreAuthorize("hasRole('BUYER')")
     public ResponseEntity<ApiResponse<String>> completeOrder(@PathVariable String id) {
         orderService.completeOrder(UUID.fromString(id));
-        return ResponseEntity.ok(ApiResponse.success("Đơn hàng đã hoàn thành. Tiền đã được chuyển vào ví người bán."));
+        return ResponseEntity.ok(ApiResponse.success("Đã xác nhận nhận hàng. Đang chờ Admin duyệt chi."));
+    }
+
+    @PostMapping("/{id}/approve-payout")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> approvePayout(@PathVariable String id) {
+        orderService.approvePayout(UUID.fromString(id));
+        return ResponseEntity.ok(ApiResponse.success("Đã duyệt giải ngân tiền cho người bán."));
     }
 
     @PostMapping("/{id}/review")
@@ -109,5 +116,30 @@ public class OrderController {
             @RequestParam com.aquatrade.core.domain.enums.OrderStatus status) {
         orderService.updateOrderStatus(UUID.fromString(id), status);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái đơn hàng thành công."));
+    }
+
+    @PostMapping("/{id}/dispute")
+    @PreAuthorize("hasRole('BUYER')")
+    public ResponseEntity<ApiResponse<String>> disputeOrder(
+            @PathVariable String id,
+            @RequestParam String reason) {
+        orderService.disputeOrder(UUID.fromString(id), reason);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi khiếu nại đơn hàng. Vui lòng chờ phản hồi."));
+    }
+
+    @PostMapping("/{id}/respond-dispute")
+    @PreAuthorize("hasRole('SELLER')")
+    public ResponseEntity<ApiResponse<String>> respondToDispute(
+            @PathVariable String id,
+            @RequestParam String comment) {
+        orderService.respondToDispute(UUID.fromString(id), comment);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi phản hồi khiếu nại."));
+    }
+
+    @PostMapping("/{id}/refund")
+    @PreAuthorize("hasAnyRole('SELLER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<String>> refundOrder(@PathVariable String id) {
+        orderService.refundOrder(UUID.fromString(id));
+        return ResponseEntity.ok(ApiResponse.success("Phê duyệt hoàn tiền thành công. Tiền (90%) đã được chuyển lại cho người mua."));
     }
 }

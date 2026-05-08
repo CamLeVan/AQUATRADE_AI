@@ -60,6 +60,10 @@ public class OrderDto {
 
         // [FIX] Hỗ trợ danh sách Bằng chứng số cho Đếm AI Hai Chiều
         private java.util.List<DigitalProofSummary> proofs;
+
+        // [THÊM MỚI] Thông tin khiếu nại
+        private String disputeReason;
+        private String sellerResponse;
     }
 
     /**

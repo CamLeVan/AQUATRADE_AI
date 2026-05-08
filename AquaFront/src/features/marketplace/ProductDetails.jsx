@@ -222,7 +222,15 @@ const ProductDetails = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-3">
-                                        {(JSON.parse(localStorage.getItem('user'))?.role !== 'ADMIN') ? (
+                                        {JSON.parse(localStorage.getItem('user'))?.role === 'ADMIN' ? (
+                                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[10px] font-bold uppercase text-center leading-relaxed">
+                                                Tài khoản Admin không có quyền thực hiện giao dịch mua bán.
+                                            </div>
+                                        ) : JSON.parse(localStorage.getItem('user'))?.userId === product.sellerId ? (
+                                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[10px] font-bold uppercase text-center leading-relaxed">
+                                                Bạn là người đăng bài này. Bạn không thể tự mua sản phẩm của chính mình.
+                                            </div>
+                                        ) : (
                                             <>
                                                 <button
                                                     onClick={handleAddToCart}
@@ -238,10 +246,6 @@ const ProductDetails = () => {
                                                     Mua ngay
                                                 </button>
                                             </>
-                                        ) : (
-                                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-[10px] font-bold uppercase text-center leading-relaxed">
-                                                Tài khoản Admin không có quyền thực hiện giao dịch mua bán.
-                                            </div>
                                         )}
                                     </div>
                                 </div>

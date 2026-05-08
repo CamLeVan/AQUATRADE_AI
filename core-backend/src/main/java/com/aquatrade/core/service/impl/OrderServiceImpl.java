@@ -75,8 +75,19 @@ public class OrderServiceImpl implements OrderService {
 
         // Lấy Buyer từ JWT SecurityContext (DỮ LIỆU THẬT)
         UUID buyerId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        
+        // [INTEGRITY CHECK] Không cho phép Seller tự mua hàng của chính mình
+        if (listing.getSeller().getId().equals(buyerId)) {
+            throw new IllegalArgumentException("Hệ thống không cho phép bạn tự mua hàng từ bài đăng của chính mình.");
+        }
+
         User buyer = userRepository.findById(buyerId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy user buyer"));
+
+        // [INTEGRITY CHECK] Admin không được mua bán
+        if (buyer.getRole() == com.aquatrade.core.domain.enums.Role.ADMIN) {
+            throw new IllegalArgumentException("Tài khoản Quản trị viên không có quyền thực hiện giao dịch mua bán.");
+        }
 
         // BE tự tính giá từ DB theo Số lượng KHÁCH MUỐN MUA
         BigDecimal subtotal = listing.getPricePerFish()
@@ -144,7 +155,6 @@ public class OrderServiceImpl implements OrderService {
         boolean isBuyer = order.getBuyer().getId().equals(currentUserId);
         boolean isSeller = order.getListing().getSeller().getId().equals(currentUserId);
         
-        // MVP: Assuming ADMIN can bypass this if needed in the future, for now strict to participants
         if (!isBuyer && !isSeller) {
             throw new org.springframework.security.access.AccessDeniedException("Bạn không có quyền xem đơn hàng này");
         }
@@ -155,12 +165,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<OrderDto.OrderResponse> getMyOrders() {
         UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        // Lấy đơn hàng mình đi mua
         List<Order> boughtOrders = orderRepository.findByBuyerIdOrderByCreatedAtDesc(currentUserId);
-        // Lấy đơn hàng mình bán cho người khác
         List<Order> soldOrders = orderRepository.findByListingSellerIdOrderByCreatedAtDesc(currentUserId);
 
-        // Gộp lại và sắp xếp theo thời gian mới nhất
         java.util.List<Order> allOrders = new java.util.ArrayList<>();
         allOrders.addAll(boughtOrders);
         allOrders.addAll(soldOrders);
@@ -211,6 +218,8 @@ public class OrderServiceImpl implements OrderService {
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
                 .proofs(proofSummaries)
+                .disputeReason(entity.getDisputeReason())
+                .sellerResponse(entity.getSellerResponse())
                 .build();
     }
 
@@ -220,19 +229,77 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + id));
 
-        // Kiểm tra quyền: Chỉ Buyer mới được quyền bấm xác nhận (hoặc hệ thống AI tự động gọi)
         UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!order.getBuyer().getId().equals(currentUserId)) {
             throw new IllegalArgumentException("Chỉ người mua mới được phép xác nhận hoàn thành đơn hàng.");
         }
 
-        if (order.getStatus() != OrderStatus.ESCROW_LOCKED && order.getStatus() != OrderStatus.READY_TO_PAYOUT) {
-            throw new IllegalArgumentException("Đơn hàng không ở trạng thái hợp lệ để hoàn thành.");
+        if (order.getStatus() != OrderStatus.DELIVERED) {
+            throw new IllegalArgumentException("Bạn chỉ có thể xác nhận hoàn tất sau khi đơn hàng đã được giao tới (DELIVERED).");
         }
 
-        // Đóng vòng đời Order
+        order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.READY_TO_PAYOUT);
+        orderRepository.save(order);
+        log.info("Order {} đã được Buyer xác nhận nhận hàng. Đang chờ Admin duyệt chi (READY_TO_PAYOUT).", id);
+    }
+
+    @Override
+    @Transactional
+    public void approvePayout(UUID id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + id));
+
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = userRepository.findById(currentUserId).get();
+        if (currentUser.getRole() != com.aquatrade.core.domain.enums.Role.ADMIN) {
+            throw new SecurityException("Chỉ Quản trị viên mới có quyền duyệt giải ngân tiền.");
+        }
+
+        if (order.getStatus() != OrderStatus.READY_TO_PAYOUT) {
+            throw new IllegalArgumentException("Đơn hàng phải ở trạng thái READY_TO_PAYOUT mới có thể duyệt chi.");
+        }
+
+        // --- LOGIC TÍNH TIỀN ---
+        BigDecimal totalWithFees = order.getTotalPrice();
+        BigDecimal shippingFee = new BigDecimal("50000");
+        BigDecimal aiFee = new BigDecimal("25000");
+        BigDecimal subtotal = totalWithFees.subtract(shippingFee).subtract(aiFee);
+        
+        BigDecimal commission = subtotal.multiply(new BigDecimal("0.05"))
+                .setScale(0, java.math.RoundingMode.HALF_UP);
+        BigDecimal sellerPayout = subtotal.subtract(commission);
+
+        // 1. Cộng tiền cho Người bán
+        User seller = order.getListing().getSeller();
+        BigDecimal currentSellerBalance = seller.getWalletBalance() != null ? seller.getWalletBalance() : BigDecimal.ZERO;
+        seller.setWalletBalance(currentSellerBalance.add(sellerPayout));
+        userRepository.save(seller);
+
+        // 2. Chuyển tiền cho Platform (Treasury)
+        SystemTreasury treasury = systemTreasuryRepository.findById(1)
+                .orElse(SystemTreasury.builder().id(1).totalRevenue(BigDecimal.ZERO).build());
+        
+        BigDecimal platformIncome = commission.add(shippingFee).add(aiFee);
+        treasury.setTotalRevenue(treasury.getTotalRevenue().add(platformIncome));
+        systemTreasuryRepository.save(treasury);
+
+        // 3. Log Transaction cho Seller
+        Transaction sellerTx = Transaction.builder()
+                .order(order)
+                .user(seller)
+                .amount(sellerPayout)
+                .postBalance(seller.getWalletBalance())
+                .type(TransactionType.ORDER_PAYOUT)
+                .status(TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(sellerTx);
+
+        // 4. Chốt trạng thái Order
         order.setStatus(com.aquatrade.core.domain.enums.OrderStatus.COMPLETED);
         orderRepository.save(order);
+
+        log.info("Admin đã duyệt giải ngân cho Order {}. Seller {} nhận: {}đ. Platform nhận: {}đ", 
+                id, seller.getFullName(), sellerPayout, platformIncome);
 
         eventPublisher.publishEvent(new com.aquatrade.core.domain.event.OrderCompletedEvent(order));
     }
@@ -243,25 +310,20 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng với ID: " + id));
 
-        // Kiểm tra trạng thái: Chỉ những đơn đã khóa tiền hoặc đang tranh chấp mới cần hoàn tiền
         if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Đơn hàng không thể hủy trong trạng thái hiện tại.");
         }
 
         UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        // Cho phép Buyer hủy nếu chưa xác nhận (hoặc sau này thêm logic Admin)
         if (!order.getBuyer().getId().equals(currentUserId)) {
-            // Tạm thời chỉ cho phép Buyer thao tác, Admin sẽ có API riêng
             throw new IllegalArgumentException("Chỉ người mua (hoặc Admin) mới được quyền hủy đơn.");
         }
 
-        // Hoàn tiền từ kho Escrow về lại ví Buyer
-        User buyer = order.getBuyer();
         BigDecimal refundAmount = order.getTotalPrice();
+        User buyer = order.getBuyer();
         buyer.setWalletBalance(buyer.getWalletBalance().add(refundAmount));
         userRepository.save(buyer);
 
-        // Ghi lại lịch sử (Log) - Hoàn tiền
         Transaction refundTx = Transaction.builder()
                 .order(order)
                 .user(buyer)
@@ -272,7 +334,6 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         transactionRepository.save(refundTx);
 
-        // Đóng vòng đời Order với trạng thái CANCELLED
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
 
@@ -322,7 +383,7 @@ public class OrderServiceImpl implements OrderService {
                     orderId, sellerTotal, buyerTotal, String.format("%.2f", discrepancy * 100));
         } else {
             order.setStatus(OrderStatus.READY_TO_PAYOUT);
-            order.setFinalQuantity(buyerTotal); // Lấy số lượng thực nhận để tính tiền
+            order.setFinalQuantity(buyerTotal); 
             log.info("[CONFIRMATION SUCCESS] Order {}: Seller Total = {}, Buyer Total = {}. Status -> READY_TO_PAYOUT.", 
                     orderId, sellerTotal, buyerTotal);
         }
@@ -392,14 +453,13 @@ public class OrderServiceImpl implements OrderService {
         proof.setProofHash("PENDING"); 
         proof.setProofRole(role);
         proof.setBatchName(batchName);
-        proof = digitalProofRepository.save(proof); // save to get ID
+        proof = digitalProofRepository.save(proof); 
 
         if (order.getStatus() == OrderStatus.ESCROW_LOCKED) {
              order.setStatus(OrderStatus.COUNTING_AI);
              orderRepository.save(order);
         }
 
-        // Gọi AI Service
         String callbackUrl = appBaseUrl + "/api/v1/internal/orders/" + orderId + "/proofs/" + proof.getId() + "/ai-result";
 
         Map<String, String> aiRequest = new HashMap<>();
@@ -419,11 +479,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    /**
-     * Tự động quét các bản ghi DigitalProof bị kẹt ở trạng thái PENDING quá 10 phút.
-     * Chạy mỗi 5 phút một lần.
-     */
-    @Scheduled(fixedDelay = 300000) // 5 minutes
+    @Scheduled(fixedDelay = 300000) 
     @Transactional
     public void cleanupPendingProofs() {
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
@@ -436,7 +492,6 @@ public class OrderServiceImpl implements OrderService {
                 proof.setErrorMessage("AI Service timeout (10 minutes). Please try again.");
                 digitalProofRepository.save(proof);
                 
-                // Notify FE via WebSocket
                 AIDetectionDto.DonePayload failPayload = AIDetectionDto.DonePayload.builder()
                         .status("FAILED")
                         .orderId(proof.getOrder().getId().toString())
@@ -453,7 +508,6 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
 
-        // Tính toán lại giá trị dựa trên số lượng thực tế Admin duyệt
         BigDecimal unitPrice = order.getUnitPriceAtPurchase();
         BigDecimal shippingFee = new BigDecimal("50000");
         BigDecimal aiFee = new BigDecimal("25000");
@@ -461,20 +515,18 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal newSubtotal = unitPrice.multiply(BigDecimal.valueOf(finalQuantity));
         BigDecimal newTotal = newSubtotal.add(shippingFee).add(aiFee);
 
-        // Nếu số lượng thực tế ít hơn lúc đặt -> Hoàn tiền chênh lệch cho Buyer
         if (newTotal.compareTo(order.getTotalPrice()) < 0) {
             BigDecimal refundAmount = order.getTotalPrice().subtract(newTotal);
             User buyer = order.getBuyer();
             buyer.setWalletBalance(buyer.getWalletBalance().add(refundAmount));
             userRepository.save(buyer);
             
-            // Log giao dịch hoàn tiền
             Transaction refundTx = Transaction.builder()
                     .order(order)
                     .user(buyer)
                     .amount(refundAmount)
                     .postBalance(buyer.getWalletBalance())
-                    .type(TransactionType.ORDER_PAYOUT) // Hoặc tạo type mới REFUND
+                    .type(TransactionType.ORDER_PAYOUT) 
                     .status(TransactionStatus.SUCCESS)
                     .build();
             transactionRepository.save(refundTx);
@@ -483,7 +535,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setFinalQuantity(finalQuantity);
         order.setTotalPrice(newTotal);
-        order.setStatus(OrderStatus.PREPARING); // Chuyển sang trạng thái Đang chuẩn bị sau khi Admin duyệt
+        order.setStatus(OrderStatus.PREPARING); 
         orderRepository.save(order);
     }
 
@@ -493,17 +545,14 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
 
-        // KHÓA VĨNH VIỄN: Nếu đơn hàng đã hoàn tất thì không được đổi nữa
         if (order.getStatus() == OrderStatus.COMPLETED) {
             throw new IllegalArgumentException("Đơn hàng đã hoàn tất vĩnh viễn, không thể thay đổi trạng thái!");
         }
 
-        // Lấy thông tin người dùng đang đăng nhập
         UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Người dùng không tồn tại"));
 
-        // KIỂM TRA QUYỀN: Chỉ Admin hoặc Chính Người bán của sản phẩm này mới được cập nhật
         boolean isAdmin = currentUser.getRole().name().equals("ADMIN");
         boolean isOwnerSeller = order.getListing().getSeller().getId().equals(currentUserId);
 
@@ -514,5 +563,101 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(newStatus);
         orderRepository.save(order);
         log.info("Order {} status updated to {} by {}", orderId, newStatus, currentUser.getUsername());
+    }
+
+    @Override
+    @Transactional
+    public void disputeOrder(UUID orderId, String reason) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!order.getBuyer().getId().equals(currentUserId)) {
+            throw new IllegalArgumentException("Chỉ người mua mới được quyền khiếu nại.");
+        }
+
+        if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
+            throw new IllegalArgumentException("Đơn hàng chưa ở trạng thái có thể khiếu nại (Cần DELIVERED hoặc COMPLETED).");
+        }
+
+        order.setStatus(OrderStatus.DISPUTED);
+        order.setDisputeReason(reason);
+        orderRepository.save(order);
+        log.info("Order {} bị khiếu nại bởi Buyer {}. Lý do: {}", orderId, order.getBuyer().getFullName(), reason);
+    }
+
+    @Override
+    @Transactional
+    public void respondToDispute(UUID orderId, String response) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!order.getListing().getSeller().getId().equals(currentUserId)) {
+            throw new IllegalArgumentException("Chỉ người bán mới được quyền phản hồi khiếu nại.");
+        }
+
+        if (order.getStatus() != OrderStatus.DISPUTED) {
+            throw new IllegalArgumentException("Đơn hàng này không ở trạng thái khiếu nại.");
+        }
+
+        order.setSellerResponse(response);
+        orderRepository.save(order);
+        log.info("Seller {} đã phản hồi khiếu nại cho Order {}: {}", order.getListing().getSeller().getFullName(), orderId, response);
+    }
+
+    @Override
+    @Transactional
+    public void refundOrder(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+        UUID currentUserId = (UUID) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = userRepository.findById(currentUserId).get();
+
+        boolean isAdmin = currentUser.getRole().name().equals("ADMIN");
+        boolean isSeller = order.getListing().getSeller().getId().equals(currentUserId);
+
+        if (!isAdmin && !isSeller) {
+            throw new IllegalArgumentException("Chỉ Admin hoặc Người bán mới được quyền phê duyệt hoàn tiền.");
+        }
+
+        if (order.getStatus() != OrderStatus.DISPUTED) {
+            throw new IllegalArgumentException("Đơn hàng phải ở trạng thái khiếu nại mới có thể hoàn tiền.");
+        }
+
+        BigDecimal totalPrice = order.getTotalPrice();
+        BigDecimal refundAmount = totalPrice.multiply(new BigDecimal("0.90"))
+                .setScale(0, java.math.RoundingMode.DOWN);
+
+        User buyer = order.getBuyer();
+        buyer.setWalletBalance(buyer.getWalletBalance().add(refundAmount));
+        userRepository.save(buyer);
+
+        BigDecimal totalWithFees = order.getTotalPrice();
+        BigDecimal shippingFee = new BigDecimal("50000");
+        BigDecimal aiFee = new BigDecimal("25000");
+        BigDecimal subtotal = totalWithFees.subtract(shippingFee).subtract(aiFee);
+        BigDecimal commission = subtotal.multiply(new BigDecimal("0.05")).setScale(0, java.math.RoundingMode.HALF_UP);
+        BigDecimal sellerPayout = subtotal.subtract(commission);
+
+        User seller = order.getListing().getSeller();
+        seller.setWalletBalance(seller.getWalletBalance().subtract(sellerPayout));
+        userRepository.save(seller);
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        Transaction refundTx = Transaction.builder()
+                .order(order)
+                .user(buyer)
+                .amount(refundAmount)
+                .postBalance(buyer.getWalletBalance())
+                .type(TransactionType.REFUND)
+                .status(TransactionStatus.SUCCESS)
+                .build();
+        transactionRepository.save(refundTx);
+
+        log.info("Hoàn tiền Order {}: Buyer nhận lại {}đ (đã trừ 10% phí).", orderId, refundAmount);
     }
 }

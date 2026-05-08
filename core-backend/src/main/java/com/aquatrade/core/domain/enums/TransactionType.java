@@ -7,5 +7,7 @@ public enum TransactionType {
     TOP_UP,
     WITHDRAW,
     ORDER_PAYOUT,
+    SELL_PAYOUT,
+    DISPUTE_REFUND,
     PLATFORM_COMMISSION
 }

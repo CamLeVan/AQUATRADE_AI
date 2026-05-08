@@ -49,6 +49,13 @@ public class Order extends BaseObject {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private java.util.List<DigitalProof> proofs;
 
+    // [THÊM MỚI] Thông tin khiếu nại & đối thoại
+    @Column(name = "dispute_reason", columnDefinition = "TEXT")
+    private String disputeReason;
+
+    @Column(name = "seller_response", columnDefinition = "TEXT")
+    private String sellerResponse;
+
     // [SECURITY] Optimistic Locking — chặn Double Refund / Double Complete race condition
     @Version
     @Column(name = "version")
