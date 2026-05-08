@@ -99,8 +99,8 @@ const AdminDashboard = () => {
         try {
             const response = await api.get('/orders/all');
             if (response.data.status === 'success') {
-                // Hiển thị đơn hàng đang chờ duyệt HOẶC đang trong quá trình vận chuyển
-                const shippingStatuses = ['ESCROW_LOCKED', 'PREPARING', 'SHIPPING', 'DELIVERED'];
+                // Hiển thị đơn hàng đang chờ duyệt HOẶC đang trong quá trình vận chuyển HOẶC chờ giải ngân
+                const shippingStatuses = ['ESCROW_LOCKED', 'PREPARING', 'SHIPPING', 'DELIVERED', 'READY_TO_PAYOUT'];
                 setPendingOrders(response.data.data.filter(o => shippingStatuses.includes(o.status)));
             }
         } catch (error) {
@@ -130,6 +130,58 @@ const AdminDashboard = () => {
             if (response.data.status === 'success') {
                 alert('Đã phê duyệt số lượng đơn hàng thành công!');
                 fetchPendingOrders();
+                fetchStats();
+            }
+        } catch (error) {
+            notify.error('Lỗi: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleRespondDispute = async (orderId) => {
+        const comment = prompt("Nhập phản hồi cho khiếu nại này:");
+        if (!comment) return;
+
+        try {
+            const response = await api.post(`/orders/${orderId}/respond-dispute?comment=${encodeURIComponent(comment)}`);
+            if (response.data.status === 'success') {
+                notify.success('Đã gửi phản hồi thành công!');
+                if (user.role === 'ADMIN') fetchPendingOrders();
+                else fetchSellerOrders();
+            }
+        } catch (error) {
+            notify.error('Lỗi: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleApprovePayout = async (orderId) => {
+        if (!window.confirm("Xác nhận giải ngân tiền cho Người bán? Hành động này không thể hoàn tác.")) return;
+
+        try {
+            const response = await api.post(`/orders/${orderId}/approve-payout`);
+            if (response.data.status === 'success') {
+                notify.success('Đã giải ngân tiền thành công!');
+                fetchPendingOrders();
+                fetchStats();
+            }
+        } catch (error) {
+            notify.error('Lỗi: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleRefundOrder = async (orderId) => {
+        const confirmed = await notify.confirm(
+            'Xác nhận hoàn tiền?',
+            'Bạn có chắc chắn muốn phê duyệt hoàn tiền (90%) cho đơn hàng này? Thao tác này không thể hoàn tác.',
+            'warning'
+        );
+        if (!confirmed) return;
+
+        try {
+            const response = await api.post(`/orders/${orderId}/refund`);
+            if (response.data.status === 'success') {
+                notify.success('Đã hoàn tiền thành công!');
+                if (user.role === 'ADMIN') fetchPendingOrders();
+                else fetchSellerOrders();
                 fetchStats();
             }
         } catch (error) {
@@ -413,7 +465,7 @@ const AdminDashboard = () => {
                             <button className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shadow-sm bg-white">Xuất báo cáo</button>
                         </div>
                     </div>
-                    {isAdmin ? <UserTable users={users} onToggleStatus={handleToggleUserStatus} /> : <SellerOrderTable orders={sellerOrders} onUpdateStatus={handleUpdateStatus} />}
+                    {isAdmin ? <UserTable users={users} onToggleStatus={handleToggleUserStatus} /> : <SellerOrderTable orders={sellerOrders} onUpdateStatus={handleUpdateStatus} onRespondDispute={handleRespondDispute} onRefund={handleRefundOrder} />}
                 </div>
 
                 {isAdmin && (
@@ -451,6 +503,8 @@ const AdminDashboard = () => {
                                 orders={pendingOrders}
                                 onApprove={handleApproveOrder}
                                 onUpdateStatus={handleUpdateStatus}
+                                onRefund={handleRefundOrder}
+                                onApprovePayout={handleApprovePayout}
                             />
                         </div>
                     </div>
@@ -619,7 +673,7 @@ const UserTable = ({ users, onToggleStatus }) => (
     </table>
 );
 
-const SellerOrderTable = ({ orders, onUpdateStatus }) => (
+const SellerOrderTable = ({ orders, onUpdateStatus, onRespondDispute, onRefund }) => (
     <table className="w-full text-left min-w-[800px]">
         <thead>
             <tr className="bg-slate-50">
@@ -636,7 +690,19 @@ const SellerOrderTable = ({ orders, onUpdateStatus }) => (
                     <td className="px-8 py-4 text-sm font-bold">#{order.id.substring(0, 8).toUpperCase()}</td>
                     <td className="px-8 py-4 text-sm font-medium">{order.buyerName}</td>
                     <td className="px-8 py-4 text-sm text-slate-600 font-medium">{order.listingTitle}</td>
-                    <td className="px-8 py-4 text-sm font-black text-cyan-600">{order.totalPrice?.toLocaleString()}đ</td>
+                    <td className="px-8 py-4 text-sm font-black text-cyan-600">
+                        {(order.totalPrice || 0).toLocaleString()}đ
+                        {order.status === 'DISPUTED' && (
+                            <div className="mt-2 p-2 bg-rose-50 rounded border border-rose-100 text-[10px] font-bold text-rose-700">
+                                Lý do: {order.disputeReason}
+                            </div>
+                        )}
+                        {order.sellerResponse && (
+                            <div className="mt-1 p-2 bg-blue-50 rounded border border-blue-100 text-[10px] font-bold text-blue-700">
+                                Phản hồi: {order.sellerResponse}
+                            </div>
+                        )}
+                    </td>
                     <td className="px-8 py-4 text-right">
                         <select
                             className={`bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold uppercase p-1.5 outline-none focus:ring-1 focus:ring-cyan-500 ${order.status === 'COMPLETED' ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -647,9 +713,27 @@ const SellerOrderTable = ({ orders, onUpdateStatus }) => (
                             <option value="ESCROW_LOCKED">Đã nhận đơn</option>
                             <option value="PREPARING">Đang chuẩn bị</option>
                             <option value="SHIPPING">Đang giao hàng</option>
-                            <option value="DELIVERED">Đã giao hàng</option>
-                            <option value="COMPLETED">Hoàn tất</option>
+                            <option value="DELIVERED">Xác nhận đã giao tới khách</option>
+                            <option value="READY_TO_PAYOUT">Chờ Admin duyệt chi</option>
+                            <option value="DISPUTED" disabled>Đang khiếu nại</option>
+                            <option value="CANCELLED" disabled>Đã hoàn tiền</option>
                         </select>
+                        {order.status === 'DISPUTED' && (
+                            <div className="flex gap-1 mt-2 justify-end">
+                                <button
+                                    onClick={() => onRespondDispute(order.id)}
+                                    className="px-2 py-1 bg-amber-500 text-white text-[8px] font-black uppercase rounded hover:brightness-110"
+                                >
+                                    Phản hồi
+                                </button>
+                                <button
+                                    onClick={() => onRefund(order.id)}
+                                    className="px-2 py-1 bg-rose-500 text-white text-[8px] font-black uppercase rounded hover:brightness-110"
+                                >
+                                    Hoàn tiền
+                                </button>
+                            </div>
+                        )}
                     </td>
                 </tr>
             )) : (
@@ -720,7 +804,7 @@ const DepositTable = ({ deposits, onApprove, onReject }) => (
     </table>
 );
 
-const OrderApprovalTable = ({ orders, onApprove, onUpdateStatus }) => (
+const OrderApprovalTable = ({ orders, onApprove, onUpdateStatus, onRefund, onApprovePayout }) => (
     <table className="w-full text-left min-w-[800px]">
         <thead>
             <tr className="bg-slate-50">
@@ -745,6 +829,16 @@ const OrderApprovalTable = ({ orders, onApprove, onUpdateStatus }) => (
                             <span className="material-symbols-outlined text-[12px]">verified</span>
                             AI Verified
                         </div>
+                        {o.status === 'DISPUTED' && (
+                            <div className="mt-2 p-2 bg-rose-50 rounded border border-rose-100 text-[10px] font-bold text-rose-700">
+                                Lý do: {o.disputeReason}
+                            </div>
+                        )}
+                        {o.sellerResponse && (
+                            <div className="mt-1 p-2 bg-blue-50 rounded border border-blue-100 text-[10px] font-bold text-blue-700">
+                                Phản hồi: {o.sellerResponse}
+                            </div>
+                        )}
                     </td>
                     <td className="px-8 py-4">
                         <select
@@ -756,8 +850,10 @@ const OrderApprovalTable = ({ orders, onApprove, onUpdateStatus }) => (
                             <option value="ESCROW_LOCKED">Chờ duyệt</option>
                             <option value="PREPARING">Đang chuẩn bị</option>
                             <option value="SHIPPING">Đang giao hàng</option>
-                            <option value="DELIVERED">Đã giao hàng</option>
-                            <option value="COMPLETED">Hoàn tất</option>
+                            <option value="DELIVERED">Xác nhận đã giao tới khách</option>
+                            <option value="READY_TO_PAYOUT">Chờ giải ngân</option>
+                            <option value="DISPUTED">Đang khiếu nại</option>
+                            <option value="CANCELLED">Đã hoàn tiền</option>
                         </select>
                     </td>
                     <td className="px-8 py-4 text-right">
@@ -767,6 +863,22 @@ const OrderApprovalTable = ({ orders, onApprove, onUpdateStatus }) => (
                                 className="bg-cyan-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-cyan-500/20 transition-all active:scale-95"
                             >
                                 Duyệt số lượng
+                            </button>
+                        ) : o.status === 'DISPUTED' ? (
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => onRefund(o.id)}
+                                    className="bg-rose-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:brightness-110"
+                                >
+                                    Duyệt Hoàn Tiền (90%)
+                                </button>
+                            </div>
+                        ) : o.status === 'READY_TO_PAYOUT' ? (
+                            <button
+                                onClick={() => onApprovePayout(o.id)}
+                                className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                            >
+                                Duyệt Giải Ngân
                             </button>
                         ) : (
                             <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 uppercase tracking-widest">

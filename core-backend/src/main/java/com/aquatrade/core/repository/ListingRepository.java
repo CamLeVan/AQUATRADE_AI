@@ -17,4 +17,6 @@ public interface ListingRepository extends JpaRepository<Listing, UUID> {
     long countByStatus(ListingStatus status);
     long countBySeller_Id(UUID sellerId);
     List<Listing> findBySeller_Id(UUID sellerId);
+    List<Listing> findBySeller_IdAndStatusNot(UUID sellerId, ListingStatus status);
+    List<Listing> findByStatusNot(ListingStatus status);
 }

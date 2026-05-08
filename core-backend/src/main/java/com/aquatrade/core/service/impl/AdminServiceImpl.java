@@ -95,26 +95,27 @@ public class AdminServiceImpl implements AdminService {
         log.info(">>> [DEBUG] Tìm thấy {} tin đăng đang ở trạng thái PENDING_REVIEW", pendingListings.size());
         
         return pendingListings.stream()
-                .map(l -> new ListingDto(
-                        l.getId().toString(),
-                        l.getTitle(),
-                        l.getCategory(),
-                        l.getSpecies(),
-                        l.getProvince(),
-                        l.getSizeMin(),
-                        l.getSizeMax(),
-                        l.getPricePerFish(),
-                        l.getEstimatedQuantity(),
-                        l.getAvailableQuantity(),
-                        l.getThumbnailUrl(),
-                        l.getStatus(),
-                        l.getSeller().getFullName(),
-                        true,
-                        95,
-                        "Tốt",
-                        false,
-                        l.getCreatedAt()
-                ))
+                .map(l -> ListingDto.builder()
+                        .id(l.getId().toString())
+                        .title(l.getTitle())
+                        .category(l.getCategory())
+                        .species(l.getSpecies())
+                        .province(l.getProvince())
+                        .sizeMin(l.getSizeMin())
+                        .sizeMax(l.getSizeMax())
+                        .pricePerFish(l.getPricePerFish())
+                        .estimatedQuantity(l.getEstimatedQuantity())
+                        .availableQuantity(l.getAvailableQuantity())
+                        .thumbnailUrl(l.getThumbnailUrl())
+                        .status(l.getStatus())
+                        .sellerName(l.getSeller().getFullName())
+                        .sellerId(l.getSeller().getId().toString())
+                        .aiVerified(true)
+                        .aiHealthScore(95)
+                        .qualityLabel("Tốt")
+                        .isFavorite(false)
+                        .createdAt(l.getCreatedAt())
+                        .build())
                 .collect(Collectors.toList());
     }
 
@@ -197,30 +198,31 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public List<ListingDto> getAllListings() {
-        List<Listing> allListings = listingRepository.findAll();
-        log.info(">>> [DEBUG] Tổng số tin đăng trong database: {}", allListings.size());
+        List<Listing> allListings = listingRepository.findByStatusNot(ListingStatus.DELETED);
+        log.info(">>> [DEBUG] Tổng số tin đăng (không tính DELETED) trong database: {}", allListings.size());
         
         return allListings.stream()
-                .map(l -> new ListingDto(
-                        l.getId().toString(),
-                        l.getTitle(),
-                        l.getCategory(),
-                        l.getSpecies(),
-                        l.getProvince(),
-                        l.getSizeMin(),
-                        l.getSizeMax(),
-                        l.getPricePerFish(),
-                        l.getEstimatedQuantity(),
-                        l.getAvailableQuantity(),
-                        l.getThumbnailUrl(),
-                        l.getStatus(),
-                        l.getSeller().getFullName(),
-                        true, // aiVerified mock
-                        95,   // aiHealthScore mock
-                        "Tốt", // qualityLabel mock
-                        false, // isFavorite mock
-                        l.getCreatedAt()
-                ))
+                .map(l -> ListingDto.builder()
+                        .id(l.getId().toString())
+                        .title(l.getTitle())
+                        .category(l.getCategory())
+                        .species(l.getSpecies())
+                        .province(l.getProvince())
+                        .sizeMin(l.getSizeMin())
+                        .sizeMax(l.getSizeMax())
+                        .pricePerFish(l.getPricePerFish())
+                        .estimatedQuantity(l.getEstimatedQuantity())
+                        .availableQuantity(l.getAvailableQuantity())
+                        .thumbnailUrl(l.getThumbnailUrl())
+                        .status(l.getStatus())
+                        .sellerName(l.getSeller().getFullName())
+                        .sellerId(l.getSeller().getId().toString())
+                        .aiVerified(true)
+                        .aiHealthScore(95)
+                        .qualityLabel("Tốt")
+                        .isFavorite(false)
+                        .createdAt(l.getCreatedAt())
+                        .build())
                 .collect(Collectors.toList());
     }
 }

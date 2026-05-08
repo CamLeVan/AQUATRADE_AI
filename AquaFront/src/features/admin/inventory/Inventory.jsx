@@ -10,6 +10,8 @@ const Inventory = () => {
     const [filterCategory, setFilterCategory] = useState('ALL');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedListing, setSelectedListing] = useState(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const itemsPerPage = 8;
 
     const fetchData = async () => {
@@ -18,10 +20,12 @@ const Inventory = () => {
             // Lấy thông tin user để biết role
             const userRes = await api.get('/users/me');
             const user = userRes.data.data;
-            const isAdmin = user.role === 'ADMIN';
+            const isUserAdmin = user.role === 'ADMIN';
+            setIsAdmin(isUserAdmin);
+            setCurrentUserId(user.id);
 
             // Chọn API phù hợp với vai trò
-            const listingsPath = isAdmin ? '/admin/listings' : '/listings/my-listings';
+            const listingsPath = isUserAdmin ? '/admin/listings' : '/listings/my-listings';
             
             // Đối với seller, stats sẽ được tính toán từ danh sách listings trả về
             const listingsRes = await api.get(listingsPath);
@@ -30,7 +34,7 @@ const Inventory = () => {
                 const data = listingsRes.data.data;
                 setListings(data);
                 
-                if (!isAdmin) {
+                if (!isUserAdmin) {
                     // Tự tính toán stats cho seller
                     const totalKg = data.reduce((sum, l) => sum + (l.availableQuantity || 0), 0);
                     setStats({
@@ -41,7 +45,7 @@ const Inventory = () => {
                 }
             }
 
-            if (isAdmin) {
+            if (isUserAdmin) {
                 const statsRes = await api.get('/admin/stats');
                 if (statsRes.data.status === 'success') {
                     setStats(statsRes.data.data);
@@ -65,6 +69,23 @@ const Inventory = () => {
             } catch (error) {
                 alert('Lỗi khi xóa: ' + (error.response?.data?.message || error.message));
             }
+        }
+    };
+
+    const handleModerate = async (id, status, note = '') => {
+        try {
+            const response = await api.put(`/admin/listings/${id}/moderate`, {
+                moderationStatus: status,
+                moderationNote: note || (status === 'AVAILABLE' ? 'Đã phê duyệt' : 'Từ chối bởi Admin')
+            });
+            
+            if (response.data.status === 'success') {
+                alert(status === 'AVAILABLE' ? 'Đã duyệt sản phẩm thành công!' : 'Đã từ chối sản phẩm.');
+                fetchData();
+            }
+        } catch (error) {
+            console.error('Lỗi khi duyệt sản phẩm:', error);
+            alert('Có lỗi xảy ra: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -230,7 +251,28 @@ const Inventory = () => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {isAdmin && listing.status === 'PENDING_REVIEW' && (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => handleModerate(listing.id, 'AVAILABLE')}
+                                                            className="p-2 bg-[#13ecc8]/10 text-[#00cfa8] rounded-lg hover:bg-[#13ecc8] hover:text-white transition-all shadow-sm" 
+                                                            title="Duyệt ngay"
+                                                        >
+                                                            <span className="material-icons-outlined text-sm">check</span>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                const reason = prompt('Lý do từ chối:');
+                                                                if (reason) handleModerate(listing.id, 'REJECTED', reason);
+                                                            }}
+                                                            className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all shadow-sm" 
+                                                            title="Từ chối"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">close</span>
+                                                        </button>
+                                                    </>
+                                                )}
                                                 <button 
                                                     onClick={() => setSelectedListing(listing)}
                                                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-[#13ecc8] transition-all" 
@@ -238,13 +280,15 @@ const Inventory = () => {
                                                 >
                                                     <span className="material-icons-outlined text-sm">visibility</span>
                                                 </button>
-                                                <button 
-                                                    onClick={() => handleDeleteListing(listing.id)}
-                                                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-all" 
-                                                    title="Gỡ tin"
-                                                >
-                                                    <span className="material-icons-outlined text-sm">delete_outline</span>
-                                                </button>
+                                                {isAdmin && (
+                                                    <button 
+                                                        onClick={() => handleDeleteListing(listing.id)}
+                                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-500 transition-all" 
+                                                        title="Gỡ tin (Admin)"
+                                                    >
+                                                        <span className="material-icons-outlined text-sm">delete_outline</span>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

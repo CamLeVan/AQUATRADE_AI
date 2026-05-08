@@ -6,6 +6,7 @@ import com.aquatrade.core.domain.enums.ListingStatus;
 import com.aquatrade.core.dto.ListingDto;
 import com.aquatrade.core.repository.ListingRepository;
 import com.aquatrade.core.repository.UserRepository;
+import com.aquatrade.core.repository.OrderRepository;
 import com.aquatrade.core.service.ListingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class ListingServiceImpl implements ListingService {
 
     private final ListingRepository listingRepository;
     private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
 
     @Override
     public List<ListingDto> getAllListings(String province, String species) {
@@ -82,8 +84,8 @@ public class ListingServiceImpl implements ListingService {
     @Override
     public List<ListingDto> getSellerListings(UUID sellerId) {
         log.info(">>> Đang tìm danh sách bài đăng cho Seller ID: {}", sellerId);
-        List<Listing> results = listingRepository.findBySeller_Id(sellerId);
-        log.info(">>> Kết quả tìm kiếm: {} bài đăng cho Seller ID: {}", results.size(), sellerId);
+        List<Listing> results = listingRepository.findBySeller_IdAndStatusNot(sellerId, ListingStatus.DELETED);
+        log.info(">>> Kết quả tìm kiếm: {} bài đăng (không tính DELETED) cho Seller ID: {}", results.size(), sellerId);
         
         return results.stream()
                 .map(this::mapToDto)
@@ -114,6 +116,7 @@ public class ListingServiceImpl implements ListingService {
                 .thumbnailUrl(entity.getThumbnailUrl())
                 .status(entity.getStatus())
                 .sellerName(entity.getSeller().getFullName())
+                .sellerId(entity.getSeller().getId().toString())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }
@@ -122,7 +125,19 @@ public class ListingServiceImpl implements ListingService {
     public void deleteListing(UUID id) {
         Listing listing = listingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tin đăng với ID: " + id));
-        listingRepository.delete(listing);
-        log.info("Đã xóa tin đăng ID: {}", id);
+        
+        // Kiểm tra xem tin đăng này đã có đơn hàng nào chưa
+        boolean hasOrders = orderRepository.existsByListingId(id);
+        
+        if (hasOrders) {
+            // Nếu đã có đơn hàng, chỉ xóa mềm (Soft Delete) bằng cách đổi trạng thái
+            listing.setStatus(ListingStatus.DELETED);
+            listingRepository.save(listing);
+            log.info("Đã chuyển trạng thái tin đăng ID: {} sang DELETED (do đã có đơn hàng liên kết)", id);
+        } else {
+            // Nếu chưa có đơn hàng, cho phép xóa cứng (Hard Delete)
+            listingRepository.delete(listing);
+            log.info("Đã xóa vĩnh viễn tin đăng ID: {}", id);
+        }
     }
 }

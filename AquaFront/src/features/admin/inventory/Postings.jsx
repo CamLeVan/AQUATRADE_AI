@@ -226,17 +226,10 @@ const Postings = () => {
                                                 <div className="flex items-center gap-2">
                                                     <button 
                                                         onClick={() => handleUpdatePrice(item.id, item.pricePerFish)}
-                                                        className="p-2 bg-cyan-500/10 text-cyan-600 rounded-lg hover:bg-cyan-500 hover:text-white transition-all flex items-center gap-1"
+                                                        className="p-2 bg-cyan-500/10 text-cyan-600 rounded-lg hover:bg-cyan-500 hover:text-white transition-all flex items-center gap-1 w-full justify-center"
                                                     >
                                                         <span className="material-symbols-outlined text-sm">save</span>
-                                                        <span className="text-[10px] font-bold uppercase">Lưu</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleDeleteListing(item.id)}
-                                                        className="p-2 bg-rose-500/10 text-rose-600 rounded-lg hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1"
-                                                    >
-                                                        <span className="material-symbols-outlined text-sm">delete</span>
-                                                        <span className="text-[10px] font-bold uppercase">Xóa</span>
+                                                        <span className="text-[10px] font-bold uppercase">Cập nhật giá</span>
                                                     </button>
                                                 </div>
                                             </td>

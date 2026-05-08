@@ -24,6 +24,7 @@ public class ListingDto {
     private String thumbnailUrl;
     private ListingStatus status;
     private String sellerName;
+    private String sellerId;
     private Boolean aiVerified;
     private Integer aiHealthScore;
     private String qualityLabel;
