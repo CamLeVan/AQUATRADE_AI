@@ -10,4 +10,5 @@ public enum TransactionType {
     SELL_PAYOUT,
     DISPUTE_REFUND,
     PLATFORM_COMMISSION
+    
 }

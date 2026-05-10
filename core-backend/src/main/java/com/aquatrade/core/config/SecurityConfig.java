@@ -42,6 +42,7 @@ public class SecurityConfig {
                 // === PUBLIC (không cần token) ===
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/test/**").permitAll()
+                    .requestMatchers("/api/v1/files/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/listings/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/posts/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()

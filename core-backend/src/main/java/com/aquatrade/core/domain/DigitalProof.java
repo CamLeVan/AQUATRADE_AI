@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import com.aquatrade.core.domain.enums.ProofRole;
 
 import com.aquatrade.core.domain.base.BaseObject;
 
@@ -20,8 +21,9 @@ public class DigitalProof extends BaseObject {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "proof_role", nullable = false)
-    private String proofRole; // "SELLER" or "BUYER"
+    private ProofRole proofRole; // SELLER or BUYER
 
     @Column(name = "batch_name")
     private String batchName;

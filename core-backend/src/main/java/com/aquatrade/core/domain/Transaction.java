@@ -21,7 +21,7 @@ public class Transaction extends BaseObject {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
-    private Order order; // Nullable đối với lệnh nạp rút thuần
+    private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -30,7 +30,6 @@ public class Transaction extends BaseObject {
     @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
-    // [THÊM MỚI] Số dư sổ cái ngay sau khi giao dịch — tối ưu đối soát tài chính
     @Column(name = "post_balance", precision = 15, scale = 2)
     private BigDecimal postBalance;
 
@@ -38,12 +37,10 @@ public class Transaction extends BaseObject {
     @Column(name = "type", nullable = false)
     private TransactionType type;
 
-    // [THÊM MỚI] Phương thức nạp tiền — chỉ có giá trị khi type = TOP_UP
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method")
     private PaymentMethod paymentMethod;
 
-    // [THÊM MỚI] Mã tham chiếu từ cổng VNPay để đối soát — chỉ có giá trị khi paymentMethod = VNPAY
     @Column(name = "vnpay_reference")
     private String vnpayReference;
 

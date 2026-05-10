@@ -22,7 +22,6 @@ public class User extends BaseObject {
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-    // Giữ lại username như display handle (tùy chọn, có thể null)
     @Column(name = "username", unique = true)
     private String username;
 
@@ -48,8 +47,7 @@ public class User extends BaseObject {
     @Column(name = "role", nullable = false)
     private Role role;
 
-    // [THỐNG NHẤT FE-BE] Đổi từ isActive:Boolean → UserStatus:Enum (ACTIVE/INACTIVE/PENDING)
-    // OFFLINE là trạng thái realtime (Socket) — KHÔNG lưu DB
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default
