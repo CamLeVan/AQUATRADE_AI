@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* dashboard */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.sidebar-item-active {
+  border-right: 3px solid #13ecc8;
+  background: rgba(19, 236, 200, 0.1);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* register */
+.form-input-focus:focus {
+  border-color: #13ecc8;
+  --tw-ring-color: #13ecc8;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(19, 236, 200, 0.2);
+}
+
+.teal-gradient-overlay {
+  background: linear-gradient(135deg, rgba(19, 236, 200, 0.4) 0%, rgba(16, 34, 31, 0.8) 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1f2937; }
+
+.chat-bubble-sender { background-color: #13ecc8; color: #10221f; border-radius: 1rem 1rem 0 1rem; }
+.chat-bubble-receiver { background-color: #f1f5f9; color: #334155; border-radius: 1rem 1rem 1rem 0; }
+.sidebar-item-active { border-right: 3px solid #13ecc8; background: rgba(19, 236, 200, 0.1); }
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+  75% { transform: rotate(-3deg); }
+}
+
+.animate-wobble {
+  animation: wobble 2.5s ease-in-out infinite;
+}
